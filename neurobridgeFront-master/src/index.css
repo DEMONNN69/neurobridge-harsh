@@ -1,0 +1,177 @@
+@import '@fontsource/lexend';
+@import '@fontsource/opendyslexic';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base Theme */
+:root {
+  --color-primary: 79 70 229; /* indigo-600 */
+  --color-primary-light: 165 180 252; /* indigo-300 */
+  --color-secondary: 139 92 246; /* violet-500 */
+  --color-accent: 249 115 22; /* orange-500 */
+  --color-success: 34 197 94; /* green-500 */
+  --color-warning: 234 179 8; /* yellow-500 */
+  --color-error: 239 68 68; /* red-500 */
+  
+  --color-background: 249 250 251; /* gray-50 */
+  --color-surface: 255 255 255; /* white */
+  --color-text: 17 24 39; /* gray-900 */
+  --color-text-light: 107 114 128; /* gray-500 */
+  
+  --font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --letter-spacing: 0;
+  --line-height: 1.5;
+  --word-spacing: normal;
+}
+
+/* High Contrast Theme */
+.theme-high-contrast {
+  --color-primary: 99 102 241; /* indigo-600 */
+  --color-primary-light: 129 140 248; /* indigo-400 */
+  --color-background: 0 0 0; /* black */
+  --color-surface: 31 41 55; /* gray-800 */
+  --color-text: 255 255 255; /* white */
+  --color-text-light: 209 213 219; /* gray-300 */
+  
+  --letter-spacing: 0.025em;
+  --line-height: 1.7;
+}
+
+/* Dyslexia-Friendly Theme */
+.theme-dyslexia-friendly {
+  --color-primary: 79 70 229; /* indigo-600 */
+  --color-primary-light: 165 180 252; /* indigo-300 */
+  --color-background: 255 251 235; /* cream/yellow-50 */
+  --color-surface: 254 252 232; /* lighter cream */
+  --color-text: 31 41 55; /* gray-800 */
+  --color-text-light: 75 85 99; /* gray-600 */
+  
+  --font-family: "OpenDyslexic", cursive;
+  --letter-spacing: 0.05em;
+  --line-height: 1.8;
+}
+
+/* Dyslexia Modes */
+.dyslexia-none {
+  /* Default styles */
+}
+
+.dyslexia-phonological {
+  --font-family: "Lexend", sans-serif;
+  --letter-spacing: 0.05em;
+  --line-height: 2;
+  --word-spacing: 0.25em;
+}
+
+.dyslexia-surface {
+  --font-family: "OpenDyslexic", cursive;
+  --letter-spacing: 0.025em;
+  --line-height: 1.8;
+  --word-spacing: 0.5em;
+}
+
+.dyslexia-visual {
+  --font-family: "Lexend", sans-serif;
+  --letter-spacing: 0.075em;
+  --line-height: 2.2;
+  --word-spacing: 0.35em;
+  background-color: rgb(var(--color-background));
+  background-image: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 100% calc(var(--line-height) * 1em);
+}
+
+/* Font Size Adjustments */
+.font-small {
+  font-size: 14px;
+}
+
+.font-medium {
+  font-size: 16px;
+}
+
+.font-large {
+  font-size: 18px;
+}
+
+/* Text Spacing Adjustments */
+.spacing-normal {
+  --line-height: 1.5;
+  --letter-spacing: 0;
+  --word-spacing: normal;
+}
+
+.spacing-wide {
+  --line-height: 1.8;
+  --letter-spacing: 0.025em;
+  --word-spacing: 0.25em;
+}
+
+.spacing-wider {
+  --line-height: 2;
+  --letter-spacing: 0.05em;
+  --word-spacing: 0.35em;
+}
+
+/* Apply CSS Variables */
+body {
+  font-family: var(--font-family);
+  line-height: var(--line-height);
+  letter-spacing: var(--letter-spacing);
+  word-spacing: var(--word-spacing);
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-text));
+}
+
+/* Animation for transitions */
+.theme-default,
+.theme-high-contrast,
+.theme-dyslexia-friendly,
+.font-small,
+.font-medium,
+.font-large,
+.spacing-normal,
+.spacing-wide,
+.spacing-wider,
+.dyslexia-none,
+.dyslexia-phonological,
+.dyslexia-surface,
+.dyslexia-visual {
+  transition: all 0.3s ease;
+}
+
+/* Syllable Highlighting for Phonological Mode */
+.dyslexia-phonological .highlight-syllables {
+  background: linear-gradient(
+    to right,
+    rgba(var(--color-primary-light), 0.2) 0%,
+    rgba(var(--color-primary-light), 0.2) 100%
+  );
+  border-radius: 4px;
+  padding: 0 4px;
+  margin: 0 2px;
+}
+
+/* Word Emphasis for Surface Mode */
+.dyslexia-surface .word-emphasis {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 8px;
+}
+
+.dyslexia-surface .word-emphasis img {
+  width: 24px;
+  height: 24px;
+  margin-bottom: 4px;
+}
+
+/* Visual Mode Enhancements */
+.dyslexia-visual .text-block {
+  background-color: rgba(var(--color-surface), 0.95);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
