@@ -10,7 +10,9 @@ import SchedulerPage from './pages/SchedulerPage';
 import AccessibilityPage from './pages/AccessibilityPage';
 import ChatbotPage from './pages/ChatbotPage';
 import AssessmentRedirect from './components/Auth/AssessmentRedirect';
-import TeacherProfileSetup from './components/Teacher/TeacherProfileSetup';
+import AssessmentTypeSelection from './pages/AssessmentTypeSelection';
+import AssessmentPage from './pages/AssessmentPage';
+import TeacherProfileSetup from './pages/TeacherProfileSetup';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { useAccessibility } from './hooks/useAccessibility';
@@ -27,11 +29,13 @@ function App() {
         <Route path="/register" element={<Register />} />
         
         <Route path="/dashboard" element={
-          <ProtectedRoute requireAssessment={true}>
+          <ProtectedRoute>
             {({ user }) => (
               user?.role === 'teacher' 
                 ? <TeacherDashboard /> 
-                : <StudentDashboard />
+                : <ProtectedRoute requireAssessment={true}>
+                    {() => <StudentDashboard />}
+                  </ProtectedRoute>
             )}
           </ProtectedRoute>
         } />
@@ -39,6 +43,18 @@ function App() {
         <Route path="/assessment" element={
           <ProtectedRoute allowedRoles={['student']}>
             {() => <AssessmentRedirect />}
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/student/assessment-type" element={
+          <ProtectedRoute allowedRoles={['student']}>
+            {() => <AssessmentTypeSelection />}
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/student/assessment" element={
+          <ProtectedRoute allowedRoles={['student']}>
+            {() => <AssessmentPage />}
           </ProtectedRoute>
         } />
         

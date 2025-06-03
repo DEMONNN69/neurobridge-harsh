@@ -24,6 +24,12 @@ class QuizGenerationRequestSerializer(serializers.Serializer):
         default=4,
         help_text="Number of hard questions to generate"
     )
+    assessment_type = serializers.ChoiceField(
+        choices=['dyslexia', 'autism', 'both'],
+        default='both',
+        required=False,
+        help_text="Type of assessment chosen by user"
+    )
 
     def validate(self, data):
         """Custom validation to ensure at least one question is requested and not too many."""
@@ -69,6 +75,12 @@ class QuestionTimingSerializer(serializers.Serializer):
 class AssessmentSubmissionSerializer(serializers.Serializer):
     """Serializer for assessment submission data."""
     session_id = serializers.CharField(required=False)
+    assessment_type = serializers.ChoiceField(
+        choices=['dyslexia', 'autism', 'both'],
+        default='both',
+        required=False,
+        help_text="Type of assessment chosen by user"
+    )
     answers = serializers.ListField(child=AssessmentAnswerSerializer())
     total_questions = serializers.IntegerField(min_value=1)
     correct_answers = serializers.IntegerField(min_value=0)

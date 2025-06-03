@@ -359,6 +359,7 @@ export interface QuizGenerationRequest {
   num_easy: number;
   num_moderate: number;
   num_hard: number;
+  assessment_type?: string;  // Track user's assessment type choice
 }
 
 export interface QuizGenerationResponse {
@@ -398,6 +399,7 @@ export interface QuestionTiming {
 
 export interface AssessmentSubmission {
   session_id?: string;  // Added session tracking
+  assessment_type?: string;  // Track user's assessment type choice
   answers: AssessmentAnswer[];
   total_questions: number;
   correct_answers: number;
@@ -407,9 +409,12 @@ export interface AssessmentSubmission {
 
 export interface AssessmentResult {
   session_id: string;
+  assessment_type: string;
   accuracy: number;
   total_questions: number;
   correct_answers: number;
+  dyslexia_score?: number;  // Score for dyslexia questions only
+  autism_score?: number;    // Score for autism questions only
   wrong_questions: Array<{
     question_id: string;
     condition_type: string;

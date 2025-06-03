@@ -20,6 +20,7 @@ interface QuestionTiming {
 
 interface AssessmentSubmission {
   session_id?: string;
+  assessment_type?: string;  // Track user's assessment type choice
   answers: AssessmentAnswer[];
   total_questions: number;
   correct_answers: number;
@@ -35,12 +36,10 @@ const AssessmentPage: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<AssessmentAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
-  
-  // Timing states
+    // Timing states
   const [assessmentStartTime, setAssessmentStartTime] = useState<number>(0);
   const [currentQuestionStartTime, setCurrentQuestionStartTime] = useState<number>(0);
   const [questionTimings, setQuestionTimings] = useState<QuestionTiming[]>([]);
-  const [totalAssessmentTime, setTotalAssessmentTime] = useState<number>(0);
   const [displayTime, setDisplayTime] = useState<string>('00:00');
   
   const [loading, setLoading] = useState(true);
@@ -96,8 +95,7 @@ const AssessmentPage: React.FC = () => {
       setCurrentQuestionStartTime(questionStart);
       console.log(`Question ${currentQuestionIndex + 1} timer started at:`, new Date(questionStart).toISOString());
     }
-  }, [currentQuestionIndex, assessmentStartTime]);
-  const generateQuestions = async () => {
+  }, [currentQuestionIndex, assessmentStartTime]);  const generateQuestions = async () => {
     // Prevent regeneration if assessment is already complete
     if (assessmentComplete || questions.length > 0) {
       return;
@@ -107,12 +105,37 @@ const AssessmentPage: React.FC = () => {
       setLoading(true);
       setError(null);
       
-      // Generate mixed questions (5 dyslexia + 5 autism)
+      // Get assessment type from localStorage or default to 'both'
+      const assessmentType = localStorage.getItem('assessmentType') || 'both';
+      
+      // Determine condition and question counts based on assessment type
+      let condition: 'dyslexia' | 'autism' | 'mixed';
+      let numEasy: number, numModerate: number, numHard: number;
+      
+      if (assessmentType === 'dyslexia') {
+        condition = 'dyslexia';
+        numEasy = 3;
+        numModerate = 4;
+        numHard = 3;
+      } else if (assessmentType === 'autism') {
+        condition = 'autism';
+        numEasy = 3;
+        numModerate = 4;
+        numHard = 3;
+      } else {
+        // Both assessments
+        condition = 'mixed';
+        numEasy = 2;
+        numModerate = 4;
+        numHard = 4;
+      }
+      
       const response = await apiService.generateQuiz({
-        condition: 'mixed',
-        num_easy: 2,
-        num_moderate: 4,
-        num_hard: 4
+        condition,
+        num_easy: numEasy,
+        num_moderate: numModerate,
+        num_hard: numHard,
+        assessment_type: assessmentType
       });
       
       setQuestions(response.questions);
@@ -208,8 +231,12 @@ const AssessmentPage: React.FC = () => {
       // Calculate correct answers count
       const correctCount = finalAnswers.filter(a => a.is_correct).length;
       
+      // Get assessment type from localStorage
+      const assessmentType = localStorage.getItem('assessmentType') || 'both';
+      
       const submission: AssessmentSubmission = {
         session_id: sessionId,
+        assessment_type: assessmentType,
         answers: finalAnswers,
         total_questions: questions.length,
         correct_answers: correctCount,

@@ -1,6 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
 from django.shortcuts import get_object_or_404
 from .models import UserProfile, StudentProfile, TeacherProfile, Achievement
 from .serializers import UserProfileSerializer, StudentProfileSerializer, TeacherProfileSerializer, AchievementSerializer
@@ -19,19 +20,25 @@ class StudentProfileView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         if self.request.user.user_type != 'student':
-            return None
-        profile, created = StudentProfile.objects.get_or_create(user=self.request.user)
-        return profile
+            raise NotFound("Profile not found for non-student users")
+        try:
+            profile = StudentProfile.objects.get(user=self.request.user)
+            return profile
+        except StudentProfile.DoesNotExist:
+            raise NotFound("Student profile not found. Please complete the assessment first.")
 
 class TeacherProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = TeacherProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-
+    
     def get_object(self):
         if self.request.user.user_type != 'teacher':
-            return None
-        profile, created = TeacherProfile.objects.get_or_create(user=self.request.user)
-        return profile
+            raise NotFound("Profile not found for non-teacher users")
+        try:
+            profile = TeacherProfile.objects.get(user=self.request.user)
+            return profile
+        except TeacherProfile.DoesNotExist:
+            raise NotFound("Teacher profile not found. Please complete the profile setup first.")
 
 class StudentAchievementsView(generics.ListCreateAPIView):
     serializer_class = AchievementSerializer

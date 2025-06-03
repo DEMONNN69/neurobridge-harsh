@@ -5,7 +5,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import { UserRole } from '../context/AuthContext';
 
 const Register: React.FC = () => {
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,8 +39,10 @@ const Register: React.FC = () => {
       return;
     }
     
+    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    
     try {
-      await register(name, username, email, password, confirmPassword, role);
+      await register(fullName, username, email, password, confirmPassword, role);
       navigate('/dashboard');
     } catch (err) {
       // Error is handled in AuthContext
@@ -72,20 +75,37 @@ const Register: React.FC = () => {
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="name" className="sr-only">
-                Full Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-800 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Full Name"
-              />
+            <div className="grid grid-cols-2 gap-x-0">
+              <div>
+                <label htmlFor="firstName" className="sr-only">
+                  First Name
+                </label>
+                <input
+                  id="firstName"
+                  name="firstName"
+                  type="text"
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-800 rounded-tl-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder="First Name"
+                />
+              </div>
+              <div>
+                <label htmlFor="lastName" className="sr-only">
+                  Last Name
+                </label>
+                <input
+                  id="lastName"
+                  name="lastName"
+                  type="text"
+                  required
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white dark:bg-gray-800 rounded-tr-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm border-l-0"
+                  placeholder="Last Name"
+                />
+              </div>
             </div>
             <div>
               <label htmlFor="username" className="sr-only">

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import AssessmentPage from '../../pages/AssessmentPage';
 
 const AssessmentRedirect: React.FC = () => {
   const { user } = useAuth();
@@ -15,9 +14,8 @@ const AssessmentRedirect: React.FC = () => {
   if (user.assessmentCompleted) {
     return <Navigate to="/student/dashboard" replace />;
   }
-
-  // Show assessment page if not completed
-  return <AssessmentPage />;
+  // Redirect to assessment type selection
+  return <Navigate to="/student/assessment-type" replace />;
 };
 
 export default AssessmentRedirect;

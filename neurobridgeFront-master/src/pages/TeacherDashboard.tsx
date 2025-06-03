@@ -54,14 +54,33 @@ const TeacherDashboard: React.FC = () => {
       // Handle teacher profile
       if (profileData.status === 'fulfilled') {
         setTeacherProfile(profileData.value);
+      } else {
+        console.error('Failed to fetch teacher profile:', profileData.reason);
+        // Don't set an error state here since the profile might not exist yet
+        // and the TeacherRouteGuard will handle redirecting to profile setup
       }
 
       // Handle courses data to calculate stats
       if (coursesData.status === 'fulfilled') {
         const courses = coursesData.value;
+        // Ensure courses is an array before filtering
+        if (Array.isArray(courses)) {
+          setStats(prev => ({
+            ...prev,
+            activeCourses: courses.filter(course => course.is_active).length
+          }));
+        } else {
+          console.warn('Courses data is not an array:', courses);
+          setStats(prev => ({
+            ...prev,
+            activeCourses: 0
+          }));
+        }
+      } else {
+        console.error('Failed to fetch courses:', coursesData.reason);
         setStats(prev => ({
           ...prev,
-          activeCourses: courses.filter(course => course.is_active).length
+          activeCourses: 0
         }));
       }
 

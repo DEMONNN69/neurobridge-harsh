@@ -22,11 +22,25 @@ class StudentProfile(models.Model):
         ('none', 'No Dyslexia'),
     ]
     
+    ASSESSMENT_TYPE_CHOICES = [
+        ('dyslexia', 'Dyslexia Only'),
+        ('autism', 'Autism Only'),
+        ('both', 'Both Assessments'),
+    ]
+    
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='student_profile')
     student_id = models.CharField(max_length=20, unique=True)
     grade_level = models.CharField(max_length=20, blank=True, null=True)
     dyslexia_type = models.CharField(max_length=20, choices=DYSLEXIA_TYPE_CHOICES, default='none')
-    assessment_score = models.FloatField(null=True, blank=True, help_text="Assessment accuracy percentage (0-100)")
+    
+    # Assessment type chosen by user
+    assessment_type = models.CharField(max_length=20, choices=ASSESSMENT_TYPE_CHOICES, null=True, blank=True)
+    
+    # Separate scores for each assessment type
+    assessment_score = models.FloatField(null=True, blank=True, help_text="Overall assessment accuracy percentage (0-100)")
+    dyslexia_score = models.FloatField(null=True, blank=True, help_text="Dyslexia assessment score (0-100)")
+    autism_score = models.FloatField(null=True, blank=True, help_text="Autism assessment score (0-100)")
+    
     learning_goals = models.TextField(blank=True, null=True)
     accommodation_notes = models.TextField(blank=True, null=True)
     parent_contact = models.EmailField(blank=True, null=True)

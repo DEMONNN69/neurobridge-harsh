@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { apiService } from '../../services/api';
-import TeacherProfileSetup from '../Teacher/TeacherProfileSetup';
 
 interface TeacherRouteGuardProps {
   children: React.ReactNode;
@@ -55,15 +54,13 @@ const TeacherRouteGuard: React.FC<TeacherRouteGuardProps> = ({ children }) => {
   // Check if we're on the profile setup page
   const isOnProfileSetupPage = location.pathname === '/teacher/profile-setup' || 
                                 location.pathname === '/profile-setup';
-
-  // If profile is incomplete and not on setup page, show profile setup
+  // If profile is incomplete and not on setup page, redirect to profile setup
   if (!profileComplete && !isOnProfileSetupPage) {
-    return <TeacherProfileSetup />;
+    return <Navigate to="/teacher/profile-setup" replace />;
   }
-
   // If profile is complete and on setup page, redirect to dashboard
   if (profileComplete && isOnProfileSetupPage) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/teacher/dashboard" replace />;
   }
 
   // Profile is complete or we're on the right page, render children

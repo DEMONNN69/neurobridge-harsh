@@ -41,11 +41,23 @@ class AssessmentSession(models.Model):
         ('severe', 'Severe'),
     ]
     
+    ASSESSMENT_TYPE_CHOICES = [
+        ('dyslexia', 'Dyslexia Only'),
+        ('autism', 'Autism Only'),
+        ('both', 'Both Assessments'),
+    ]
+    
     session_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    assessment_type = models.CharField(max_length=20, choices=ASSESSMENT_TYPE_CHOICES, default='both')
     total_questions = models.IntegerField()
     correct_answers = models.IntegerField()
     accuracy_percentage = models.FloatField()
+    
+    # Separate scores for each condition
+    dyslexia_score = models.FloatField(null=True, blank=True, help_text="Score for dyslexia questions only")
+    autism_score = models.FloatField(null=True, blank=True, help_text="Score for autism questions only")
+    
     total_assessment_time = models.IntegerField(default=0)  # Total time in seconds
     
     # AI model will analyze these later
@@ -55,7 +67,7 @@ class AssessmentSession(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"{self.user.username} - {self.accuracy_percentage}% ({self.created_at})"
+        return f"{self.user.username} - {self.assessment_type} - {self.accuracy_percentage}% ({self.created_at})"
 
 class AssessmentResponse(models.Model):
     """Model to store individual question responses"""
