@@ -86,3 +86,29 @@ def student_assessment_status(request):
             'completed': False,
             'assessment_score': None
         })
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def teacher_profile_completion_status(request):
+    """Check if teacher has completed their profile setup"""
+    if request.user.user_type != 'teacher':
+        return Response({'error': 'Only teachers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        teacher_profile = TeacherProfile.objects.get(user=request.user)
+        
+        # Check if required fields are completed
+        required_fields = ['employee_id', 'department', 'specialization']
+        completed = all(getattr(teacher_profile, field) for field in required_fields)
+        completed = completed and teacher_profile.years_of_experience is not None
+        
+        return Response({
+            'completed': completed,
+            'profile': TeacherProfileSerializer(teacher_profile).data if completed else None
+        })
+    except TeacherProfile.DoesNotExist:
+        # If no teacher profile exists, profile is not completed
+        return Response({
+            'completed': False,
+            'profile': None
+        })

@@ -625,6 +625,10 @@ class ApiService {
     });
   }
 
+  async checkTeacherProfileCompletion(): Promise<{ completed: boolean; profile?: TeacherProfile }> {
+    return this.authenticatedRequest('/profiles/teacher/profile-completion/');
+  }
+
   async getAchievements(): Promise<Achievement[]> {
     return this.authenticatedRequest('/profiles/achievements/');
   }

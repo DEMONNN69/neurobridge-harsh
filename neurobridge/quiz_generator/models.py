@@ -9,12 +9,18 @@ class AssessmentQuestion(models.Model):
         ('autism', 'Autism'),
     ]
     
+    DIFFICULTY_CHOICES = [
+        ('easy', 'Easy'),
+        ('moderate', 'Moderate'),
+        ('hard', 'Hard'),
+    ]
+    
     question_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     question_text = models.TextField()
     options = models.JSONField()  # Store options as JSON array
     correct_answer = models.CharField(max_length=1)  # A, B, C, or D
     condition_type = models.CharField(max_length=20, choices=CONDITION_CHOICES)
-    difficulty_level = models.CharField(max_length=20, default='medium')
+    difficulty_level = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='moderate')
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -58,6 +64,8 @@ class AssessmentResponse(models.Model):
     user_answer = models.CharField(max_length=1)  # A, B, C, or D
     is_correct = models.BooleanField()
     response_time = models.FloatField(null=True, blank=True)  # Time taken to answer in seconds
+    difficulty_level = models.CharField(max_length=20, choices=AssessmentQuestion.DIFFICULTY_CHOICES, default='moderate')
+    condition_type = models.CharField(max_length=20, choices=AssessmentQuestion.CONDITION_CHOICES, default='dyslexia')
     
     class Meta:
         unique_together = ['session', 'question']
@@ -72,6 +80,8 @@ class QuestionTiming(models.Model):
     start_time = models.BigIntegerField()  # Timestamp in milliseconds
     end_time = models.BigIntegerField()    # Timestamp in milliseconds
     response_time = models.FloatField()    # Time in seconds
+    difficulty_level = models.CharField(max_length=20, choices=AssessmentQuestion.DIFFICULTY_CHOICES, default='moderate')
+    condition_type = models.CharField(max_length=20, choices=AssessmentQuestion.CONDITION_CHOICES, default='dyslexia')
     
     class Meta:
         unique_together = ['session', 'question']

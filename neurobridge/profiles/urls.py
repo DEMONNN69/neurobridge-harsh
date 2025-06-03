@@ -8,4 +8,5 @@ urlpatterns = [
     path('achievements/', views.StudentAchievementsView.as_view(), name='achievements'),
     path('dashboard/stats/', views.student_dashboard_stats, name='student-dashboard-stats'),
     path('student/assessment-status/', views.student_assessment_status, name='student-assessment-status'),
+    path('teacher/profile-completion/', views.teacher_profile_completion_status, name='teacher-profile-completion'),
 ]
