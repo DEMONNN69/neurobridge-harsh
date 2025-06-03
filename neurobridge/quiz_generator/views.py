@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
 from .serializers import QuizGenerationRequestSerializer
-from .models import AssessmentQuestion, AssessmentSession, AssessmentResponse
+from .models import AssessmentQuestion, AssessmentSession, AssessmentResponse, QuestionTiming
 from profiles.models import StudentProfile
 import random
 import uuid
@@ -38,12 +38,13 @@ def submit_assessment_view(request):
         return Response({
             'error': 'Only students can submit assessments'
         }, status=status.HTTP_403_FORBIDDEN)
-    
-    # Validate required fields
+      # Validate required fields
     session_id = request.data.get('session_id')
     answers = request.data.get('answers', [])
     total_questions = request.data.get('total_questions', 0)
     correct_answers = request.data.get('correct_answers', 0)
+    total_assessment_time = request.data.get('total_assessment_time', 0)
+    question_timings = request.data.get('question_timings', [])
     
     if not answers or total_questions == 0:
         return Response({
@@ -54,16 +55,17 @@ def submit_assessment_view(request):
     accuracy = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
     
     try:
-        # Create assessment session
+        # Create assessment session with timing data
         session = AssessmentSession.objects.create(
             user=request.user,
             total_questions=total_questions,
             correct_answers=correct_answers,
             accuracy_percentage=accuracy,
+            total_assessment_time=total_assessment_time,
             # Assign random values for now (AI model will update these later)
             predicted_dyslexic_type=random.choice(['phonological', 'surface', 'mixed', 'rapid_naming', 'double_deficit']),
             predicted_severity=random.choice(['mild', 'moderate', 'severe'])
-        )        # Save individual responses for AI analysis
+        )# Save individual responses for AI analysis
         wrong_questions = []
         backend_correct_count = 0  # Recalculate based on backend verification
         
@@ -109,11 +111,30 @@ def submit_assessment_view(request):
             except AssessmentQuestion.DoesNotExist:
                 print(f"Question with ID {question_id} not found")
                 continue
-        
-        # Update session with backend-verified correct count and accuracy
+          # Update session with backend-verified correct count and accuracy
         session.correct_answers = backend_correct_count
         session.accuracy_percentage = (backend_correct_count / total_questions) * 100 if total_questions > 0 else 0
         session.save()
+        
+        # Save detailed question timing data
+        for timing_data in question_timings:
+            question_id = timing_data.get('question_id')
+            start_time = timing_data.get('start_time', 0)
+            end_time = timing_data.get('end_time', 0)
+            response_time = timing_data.get('response_time', 0)
+            
+            try:
+                question = AssessmentQuestion.objects.get(question_id=question_id)
+                QuestionTiming.objects.create(
+                    session=session,
+                    question=question,
+                    start_time=start_time,
+                    end_time=end_time,
+                    response_time=response_time
+                )
+            except AssessmentQuestion.DoesNotExist:
+                print(f"Question with ID {question_id} not found for timing data")
+                continue
         
         # Update student profile with corrected assessment score
         student_profile, created = StudentProfile.objects.get_or_create(

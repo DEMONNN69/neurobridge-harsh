@@ -27,8 +27,7 @@ class AssessmentSession(models.Model):
         ('surface', 'Surface Dyslexia'),
         ('mixed', 'Mixed Dyslexia'),
         ('rapid_naming', 'Rapid Naming Deficit'),
-        ('double_deficit', 'Double Deficit'),
-    ]
+        ('double_deficit', 'Double Deficit'),    ]
     
     SEVERITY_CHOICES = [
         ('mild', 'Mild'),
@@ -41,6 +40,7 @@ class AssessmentSession(models.Model):
     total_questions = models.IntegerField()
     correct_answers = models.IntegerField()
     accuracy_percentage = models.FloatField()
+    total_assessment_time = models.IntegerField(default=0)  # Total time in seconds
     
     # AI model will analyze these later
     predicted_dyslexic_type = models.CharField(max_length=30, choices=DYSLEXIC_TYPE_CHOICES, null=True, blank=True)
@@ -64,3 +64,17 @@ class AssessmentResponse(models.Model):
     
     def __str__(self):
         return f"{self.session.user.username} - Q{self.question.question_id} - {'✓' if self.is_correct else '✗'}"
+
+class QuestionTiming(models.Model):
+    """Model to store detailed timing information for each question"""
+    session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name='question_timings')
+    question = models.ForeignKey(AssessmentQuestion, on_delete=models.CASCADE)
+    start_time = models.BigIntegerField()  # Timestamp in milliseconds
+    end_time = models.BigIntegerField()    # Timestamp in milliseconds
+    response_time = models.FloatField()    # Time in seconds
+    
+    class Meta:
+        unique_together = ['session', 'question']
+    
+    def __str__(self):
+        return f"{self.session.user.username} - Q{self.question.question_id} - {self.response_time}s"

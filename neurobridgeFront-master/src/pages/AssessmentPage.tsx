@@ -5,17 +5,26 @@ import { ChevronLeft, ChevronRight, CheckCircle, Clock, LogOut } from 'lucide-re
 import { useAuth } from '../hooks/useAuth';
 
 interface AssessmentAnswer {
-  question_id: string;  // Changed from question_index to question_id
+  question_id: string;
   selected_answer: string;
   is_correct: boolean;
-  response_time?: number;  // Added response time tracking
+  response_time: number;  // Time taken for this specific question in seconds
+}
+
+interface QuestionTiming {
+  question_id: string;
+  start_time: number;
+  end_time: number;
+  response_time: number;
 }
 
 interface AssessmentSubmission {
-  session_id?: string;  // Added session tracking
+  session_id?: string;
   answers: AssessmentAnswer[];
   total_questions: number;
   correct_answers: number;
+  total_assessment_time: number;  // Total time for entire assessment in seconds
+  question_timings: QuestionTiming[];  // Detailed timing for each question
 }
 
 const AssessmentPage: React.FC = () => {
@@ -26,17 +35,42 @@ const AssessmentPage: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<AssessmentAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
-  const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
+  
+  // Timing states
+  const [assessmentStartTime, setAssessmentStartTime] = useState<number>(0);
+  const [currentQuestionStartTime, setCurrentQuestionStartTime] = useState<number>(0);
+  const [questionTimings, setQuestionTimings] = useState<QuestionTiming[]>([]);
+  const [totalAssessmentTime, setTotalAssessmentTime] = useState<number>(0);
+  const [displayTime, setDisplayTime] = useState<string>('00:00');
+  
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState<any>(null);
-
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
   };
+
+  // Timer effect for main assessment timer display
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (assessmentStartTime > 0 && !assessmentComplete && !loading) {
+      interval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - assessmentStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        setDisplayTime(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [assessmentStartTime, assessmentComplete, loading]);
+
   useEffect(() => {
     // Only generate questions once on mount and if assessment is not already complete
     if (!assessmentComplete && questions.length === 0) {
@@ -46,9 +80,23 @@ const AssessmentPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Reset timer when question changes
-    setQuestionStartTime(Date.now());
-  }, [currentQuestionIndex]);
+    // Start timing when questions are loaded and assessment begins
+    if (questions.length > 0 && assessmentStartTime === 0) {
+      const startTime = Date.now();
+      setAssessmentStartTime(startTime);
+      setCurrentQuestionStartTime(startTime);
+      console.log('Assessment timer started at:', new Date(startTime).toISOString());
+    }
+  }, [questions, assessmentStartTime]);
+
+  useEffect(() => {
+    // Reset question timer when question changes (but not on first load)
+    if (assessmentStartTime > 0 && currentQuestionIndex >= 0) {
+      const questionStart = Date.now();
+      setCurrentQuestionStartTime(questionStart);
+      console.log(`Question ${currentQuestionIndex + 1} timer started at:`, new Date(questionStart).toISOString());
+    }
+  }, [currentQuestionIndex, assessmentStartTime]);
   const generateQuestions = async () => {
     // Prevent regeneration if assessment is already complete
     if (assessmentComplete || questions.length > 0) {
@@ -89,8 +137,9 @@ const AssessmentPage: React.FC = () => {
   };  const handleNext = () => {
     if (!selectedAnswer) return;
 
-    // Calculate response time
-    const responseTime = (Date.now() - questionStartTime) / 1000;
+    // Calculate response time for current question
+    const questionEndTime = Date.now();
+    const responseTime = (questionEndTime - currentQuestionStartTime) / 1000;
 
     // Update answers array
     const updatedAnswers = [...answers];
@@ -101,13 +150,16 @@ const AssessmentPage: React.FC = () => {
     const isCorrect = selectedOptionText === currentQuestion.correct_answer;
     
     // Debug logging
-    console.log('Assessment Debug:', {
+    console.log('Question Timing Debug:', {
       questionIndex: currentQuestionIndex,
+      questionId: currentQuestion.question_id,
       selectedAnswer,
       selectedOptionText,
       correctAnswer: currentQuestion.correct_answer,
       isCorrect,
-      options: currentQuestion.options
+      responseTime: responseTime.toFixed(2) + ' seconds',
+      startTime: new Date(currentQuestionStartTime).toISOString(),
+      endTime: new Date(questionEndTime).toISOString()
     });
     
     updatedAnswers[currentQuestionIndex] = {
@@ -117,6 +169,15 @@ const AssessmentPage: React.FC = () => {
       response_time: responseTime
     };
     
+    // Record detailed timing for this question
+    const newQuestionTiming: QuestionTiming = {
+      question_id: currentQuestion.question_id,
+      start_time: currentQuestionStartTime,
+      end_time: questionEndTime,
+      response_time: responseTime
+    };
+    
+    setQuestionTimings(prev => [...prev, newQuestionTiming]);
     setAnswers(updatedAnswers);
     setSelectedAnswer('');
 
@@ -124,7 +185,7 @@ const AssessmentPage: React.FC = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
-      submitAssessment(updatedAnswers);
+      submitAssessment(updatedAnswers, [...questionTimings, newQuestionTiming]);
     }
   };
 
@@ -137,18 +198,31 @@ const AssessmentPage: React.FC = () => {
         setSelectedAnswer(previousAnswer.selected_answer);
       }
     }
-  };
-  const submitAssessment = async (finalAnswers: AssessmentAnswer[]) => {
+  };  const submitAssessment = async (finalAnswers: AssessmentAnswer[], finalQuestionTimings: QuestionTiming[]) => {
     try {
       setSubmitting(true);
+      
+      // Calculate total assessment time
+      const totalTime = Math.floor((Date.now() - assessmentStartTime) / 1000);
+      
       // Calculate correct answers count
       const correctCount = finalAnswers.filter(a => a.is_correct).length;
+      
       const submission: AssessmentSubmission = {
         session_id: sessionId,
         answers: finalAnswers,
         total_questions: questions.length,
-        correct_answers: correctCount
+        correct_answers: correctCount,
+        total_assessment_time: totalTime,
+        question_timings: finalQuestionTimings
       };
+
+      console.log('Submitting assessment with timing data:', {
+        totalTime: totalTime + ' seconds',
+        questionCount: finalQuestionTimings.length,
+        averageTimePerQuestion: (finalQuestionTimings.reduce((sum, q) => sum + q.response_time, 0) / finalQuestionTimings.length).toFixed(2) + ' seconds'
+      });
+
       const result = await apiService.submitAssessment(submission);
       setAssessmentResult(result);
       setAssessmentComplete(true);
@@ -156,7 +230,7 @@ const AssessmentPage: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to submit assessment');
       setSubmitting(false);
     }
-  };  const handleCompleteAssessment = () => {
+  };const handleCompleteAssessment = () => {
     // Update the user's assessment completion status
     updateAssessmentStatus(true);
     
@@ -206,9 +280,8 @@ const AssessmentPage: React.FC = () => {
             <CheckCircle className="h-12 w-12 mx-auto" />
           </div>
           <h2 className="text-2xl font-semibold text-gray-900 mb-4">Assessment Complete!</h2>
-          
-          <div className="bg-gray-50 p-4 rounded-lg mb-6">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="bg-gray-50 p-4 rounded-lg mb-6">
+            <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
                 <p className="text-gray-500">Accuracy</p>
                 <p className="font-semibold text-lg">{assessmentResult.accuracy.toFixed(1)}%</p>
@@ -218,6 +291,10 @@ const AssessmentPage: React.FC = () => {
                 <p className="font-semibold text-lg">
                   {assessmentResult.correct_answers}/{assessmentResult.total_questions}
                 </p>
+              </div>
+              <div>
+                <p className="text-gray-500">Total Time</p>
+                <p className="font-semibold text-lg">{displayTime}</p>
               </div>
             </div>
           </div>
@@ -266,8 +343,12 @@ const AssessmentPage: React.FC = () => {
       <div className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-gray-900">Learning Assessment</h1>
-            <div className="flex items-center space-x-4">
+            <h1 className="text-xl font-semibold text-gray-900">Learning Assessment</h1>            <div className="flex items-center space-x-4">
+              {/* Main Assessment Timer */}
+              <div className="flex items-center bg-blue-50 px-3 py-2 rounded-lg">
+                <Clock className="h-4 w-4 mr-2 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">Time: {displayTime}</span>
+              </div>
               <div className="flex items-center text-sm text-gray-500">
                 <Clock className="h-4 w-4 mr-1" />
                 Question {currentQuestionIndex + 1} of {questions.length}

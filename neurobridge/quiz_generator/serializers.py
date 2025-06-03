@@ -59,12 +59,21 @@ class AssessmentAnswerSerializer(serializers.Serializer):
     is_correct = serializers.BooleanField()
     response_time = serializers.FloatField(required=False, default=0)
 
+class QuestionTimingSerializer(serializers.Serializer):
+    """Serializer for individual question timing data."""
+    question_id = serializers.CharField()
+    start_time = serializers.IntegerField()  # Timestamp in milliseconds
+    end_time = serializers.IntegerField()    # Timestamp in milliseconds
+    response_time = serializers.FloatField() # Time in seconds
+
 class AssessmentSubmissionSerializer(serializers.Serializer):
     """Serializer for assessment submission data."""
     session_id = serializers.CharField(required=False)
     answers = serializers.ListField(child=AssessmentAnswerSerializer())
     total_questions = serializers.IntegerField(min_value=1)
     correct_answers = serializers.IntegerField(min_value=0)
+    total_assessment_time = serializers.IntegerField(required=False, default=0)  # Total time in seconds
+    question_timings = serializers.ListField(child=QuestionTimingSerializer(), required=False, default=list)
     
     def validate(self, data):
         """Validate that correct_answers is not greater than total_questions."""

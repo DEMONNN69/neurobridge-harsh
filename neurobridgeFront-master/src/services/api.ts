@@ -386,7 +386,14 @@ export interface AssessmentAnswer {
   question_id: string;  // Changed from question_index to question_id
   selected_answer: string;
   is_correct: boolean;
-  response_time?: number;  // Added response time tracking
+  response_time: number;  // Time taken for this specific question in seconds
+}
+
+export interface QuestionTiming {
+  question_id: string;
+  start_time: number;
+  end_time: number;
+  response_time: number;
 }
 
 export interface AssessmentSubmission {
@@ -394,6 +401,8 @@ export interface AssessmentSubmission {
   answers: AssessmentAnswer[];
   total_questions: number;
   correct_answers: number;
+  total_assessment_time: number;  // Total time for entire assessment in seconds
+  question_timings: QuestionTiming[];  // Detailed timing for each question
 }
 
 export interface AssessmentResult {
