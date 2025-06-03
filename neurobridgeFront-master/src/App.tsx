@@ -9,6 +9,7 @@ import LearningPage from './pages/LearningPage';
 import SchedulerPage from './pages/SchedulerPage';
 import AccessibilityPage from './pages/AccessibilityPage';
 import ChatbotPage from './pages/ChatbotPage';
+import AssessmentRedirect from './components/Auth/AssessmentRedirect';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { useAccessibility } from './hooks/useAccessibility';
@@ -25,7 +26,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         
         <Route path="/dashboard" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAssessment={true}>
             {({ user }) => (
               user?.role === 'teacher' 
                 ? <TeacherDashboard /> 
@@ -34,32 +35,38 @@ function App() {
           </ProtectedRoute>
         } />
         
+        <Route path="/assessment" element={
+          <ProtectedRoute allowedRoles={['student']}>
+            {() => <AssessmentRedirect />}
+          </ProtectedRoute>
+        } />
+        
         <Route path="/profile" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAssessment={true}>
             {() => <ProfilePage />}
           </ProtectedRoute>
         } />
         
         <Route path="/learning" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAssessment={true}>
             {() => <LearningPage />}
           </ProtectedRoute>
         } />
         
         <Route path="/scheduler" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAssessment={true}>
             {() => <SchedulerPage />}
           </ProtectedRoute>
         } />
         
         <Route path="/accessibility" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAssessment={true}>
             {() => <AccessibilityPage />}
           </ProtectedRoute>
         } />
         
         <Route path="/chatbot" element={
-          <ProtectedRoute>
+          <ProtectedRoute requireAssessment={true}>
             {() => <ChatbotPage />}
           </ProtectedRoute>
         } />
@@ -71,7 +78,7 @@ function App() {
         } />
         
         <Route path="/student/*" element={
-          <ProtectedRoute allowedRoles={['student']}>
+          <ProtectedRoute allowedRoles={['student']} requireAssessment={true}>
             {() => <StudentDashboard />}
           </ProtectedRoute>
         } />

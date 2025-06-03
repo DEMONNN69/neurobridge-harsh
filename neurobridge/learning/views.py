@@ -165,3 +165,16 @@ def update_progress(request, lesson_id):
     progress.save()
     
     return Response(ProgressSerializer(progress).data, status=status.HTTP_200_OK)
+
+class ProgressListView(generics.ListAPIView):
+    serializer_class = ProgressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user.user_type == 'student':
+            return Progress.objects.filter(student=self.request.user).select_related('lesson', 'lesson__course')
+        elif self.request.user.user_type == 'teacher':
+            # Teachers can see progress for students in their courses
+            teacher_courses = Course.objects.filter(teacher=self.request.user)
+            return Progress.objects.filter(lesson__course__in=teacher_courses).select_related('student', 'lesson', 'lesson__course')
+        return Progress.objects.none()

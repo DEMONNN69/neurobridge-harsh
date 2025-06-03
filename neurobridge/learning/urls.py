@@ -10,5 +10,6 @@ urlpatterns = [
     path('assignments/<int:assignment_id>/submissions/', views.SubmissionListCreateView.as_view(), name='assignment-submissions'),
     path('submissions/', views.SubmissionListCreateView.as_view(), name='submission-list'),
     path('enroll/<int:course_id>/', views.enroll_in_course, name='enroll-course'),
+    path('progress/', views.ProgressListView.as_view(), name='progress-list'),
     path('progress/<int:lesson_id>/', views.update_progress, name='update-progress'),
 ]

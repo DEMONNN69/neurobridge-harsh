@@ -40,6 +40,7 @@ export interface StudentProfile {
   student_id: string;
   grade_level?: string;
   dyslexia_type: 'phonological' | 'surface' | 'visual' | 'mixed' | 'none';
+  assessment_score?: number;
   learning_goals?: string;
   accommodation_notes?: string;
   parent_contact?: string;
@@ -246,7 +247,7 @@ export interface DyslexiaProfile {
   visual_processing_score?: number;
   working_memory_score?: number;
   processing_speed_score?: number;
-  reading_difficulty_level?: 'mild' | 'moderate' | 'severe';
+  reading_difficulty_level?: number;
   spelling_difficulty: boolean;
   writing_difficulty: boolean;
   math_difficulty: boolean;
@@ -339,6 +340,78 @@ export interface ChatFeedback {
   created_at: string;
   message: number;
   user: number;
+}
+
+// Quiz Generator interfaces
+export interface QuizQuestion {
+  id: number;
+  question_id: string;  // UUID for tracking
+  question: string;
+  options: string[];
+  correct_answer: string;
+  difficulty: 'easy' | 'moderate' | 'hard';
+  condition: 'dyslexia' | 'autism';  // Track question type
+  explanation?: string;
+}
+
+export interface QuizGenerationRequest {
+  condition: 'dyslexia' | 'autism' | 'mixed';  // Added 'mixed' option
+  num_easy: number;
+  num_moderate: number;
+  num_hard: number;
+}
+
+export interface QuizGenerationResponse {
+  session_id: string;  // Added session tracking
+  questions: QuizQuestion[];
+  total_questions: number;
+  condition: string;
+  dyslexia_questions?: number;  // Count of dyslexia questions
+  autism_questions?: number;    // Count of autism questions
+  generated_at: string;
+  generated_by?: number;
+}
+
+export interface QuizInfo {
+  available_conditions: string[];
+  difficulty_levels: string[];
+  max_questions_per_request: number;
+  min_questions_per_request: number;
+  supported_formats: string[];
+  api_version: string;
+  description: string;
+}
+
+export interface AssessmentAnswer {
+  question_id: string;  // Changed from question_index to question_id
+  selected_answer: string;
+  is_correct: boolean;
+  response_time?: number;  // Added response time tracking
+}
+
+export interface AssessmentSubmission {
+  session_id?: string;  // Added session tracking
+  answers: AssessmentAnswer[];
+  total_questions: number;
+  correct_answers: number;
+}
+
+export interface AssessmentResult {
+  session_id: string;
+  accuracy: number;
+  total_questions: number;
+  correct_answers: number;
+  wrong_questions: Array<{
+    question_id: string;
+    condition_type: string;
+    difficulty: string;
+    user_answer: string;
+    correct_answer: string;
+  }>;
+  wrong_questions_count: number;
+  predicted_dyslexic_type: string;
+  predicted_severity: string;
+  message: string;
 }
 
 class ApiService {
@@ -513,6 +586,17 @@ class ApiService {
 
   async getStudentProfile(): Promise<StudentProfile> {
     return this.authenticatedRequest('/profiles/student/');
+  }
+
+  async checkNeedsAssessment(): Promise<boolean> {
+    try {
+      const studentProfile = await this.getStudentProfile();
+      // If dyslexia_type is 'none' or not set, student needs assessment
+      return !studentProfile.dyslexia_type || studentProfile.dyslexia_type === 'none';
+    } catch (error) {
+      // If profile doesn't exist or there's an error, assume assessment is needed
+      return true;
+    }
   }
 
   async updateStudentProfile(data: Partial<StudentProfile>): Promise<StudentProfile> {
@@ -829,6 +913,30 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  // Quiz Generator API methods
+  async generateQuiz(data: QuizGenerationRequest): Promise<QuizGenerationResponse> {
+    return this.authenticatedRequest('/quiz/generate/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getQuizInfo(): Promise<QuizInfo> {
+    return this.authenticatedRequest('/quiz/info/');
+  }
+
+  async submitAssessment(data: AssessmentSubmission): Promise<AssessmentResult> {
+    return this.authenticatedRequest('/quiz/submit/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Check if student has completed assessment
+  async checkAssessmentCompletion(): Promise<{ completed: boolean; assessment_score?: number }> {
+    return this.authenticatedRequest('/profiles/student/assessment-status/');
   }
 }
 

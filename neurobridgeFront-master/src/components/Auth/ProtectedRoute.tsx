@@ -6,11 +6,13 @@ import { UserRole } from '../../context/AuthContext';
 interface ProtectedRouteProps {
   children: (props: { user: ReturnType<typeof useAuth>['user'] }) => React.ReactNode;
   allowedRoles?: UserRole[];
+  requireAssessment?: boolean; // New prop to indicate if route requires assessment completion
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
-  allowedRoles 
+  allowedRoles,
+  requireAssessment = false
 }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
 
@@ -29,6 +31,11 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     // Redirect to appropriate dashboard based on role
     return <Navigate to={`/${user.role}/dashboard`} replace />;
+  }
+
+  // Check assessment completion for students accessing dashboard/main content
+  if (user && user.role === 'student' && requireAssessment && !user.assessmentCompleted) {
+    return <Navigate to="/assessment" replace />;
   }
 
   return <>{children({ user })}</>;

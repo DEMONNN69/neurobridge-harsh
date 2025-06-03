@@ -64,3 +64,25 @@ def student_dashboard_stats(request):
     }
     
     return Response(stats)
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def student_assessment_status(request):
+    """Check if student has completed the assessment"""
+    if request.user.user_type != 'student':
+        return Response({'error': 'Only students can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        student_profile = StudentProfile.objects.get(user=request.user)
+        completed = student_profile.assessment_score is not None
+        
+        return Response({
+            'completed': completed,
+            'assessment_score': student_profile.assessment_score if completed else None
+        })
+    except StudentProfile.DoesNotExist:
+        # If no student profile exists, assessment is not completed
+        return Response({
+            'completed': False,
+            'assessment_score': None
+        })

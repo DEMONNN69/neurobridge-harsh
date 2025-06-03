@@ -8,6 +8,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  assessmentCompleted?: boolean; // For students only
 }
 
 interface AuthContextType {
@@ -18,6 +19,8 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   error: string | null;
+  checkAssessmentStatus: () => Promise<boolean>; // Helper function to check assessment status
+  updateAssessmentStatus: (completed: boolean) => void; // Function to update assessment status
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -28,6 +31,8 @@ export const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   isLoading: false,
   error: null,
+  checkAssessmentStatus: async () => false,
+  updateAssessmentStatus: () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -45,12 +50,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           // Verify token is still valid by fetching current user
           const userData = await apiService.getCurrentUser();
-          const user = {
+          const user: User = {
             id: userData.id.toString(),
             name: `${userData.first_name} ${userData.last_name}`,
             email: userData.email,
             role: userData.user_type,
           };
+
+          // For students, check assessment completion status
+          if (user.role === 'student') {
+            try {
+              const assessmentStatus = await apiService.checkAssessmentCompletion();
+              user.assessmentCompleted = assessmentStatus.completed;
+            } catch (error) {
+              console.error('Failed to check assessment status during auth check:', error);
+              user.assessmentCompleted = false;
+            }
+          }
+
           setUser(user);
           localStorage.setItem('user', JSON.stringify(user));
         } catch (error) {
@@ -66,6 +83,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuth();
   }, []);
 
+  const updateAssessmentStatus = (completed: boolean) => {
+    if (user && user.role === 'student') {
+      const updatedUser = { ...user, assessmentCompleted: completed };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+  };
+
+  const checkAssessmentStatus = async (): Promise<boolean> => {
+    if (!user || user.role !== 'student') {
+      return false;
+    }
+    
+    try {
+      const response = await apiService.checkAssessmentCompletion();
+      return response.completed;
+    } catch (error) {
+      console.error('Failed to check assessment status:', error);
+      return false;
+    }
+  };
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
@@ -78,6 +117,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: response.user.email,
         role: response.user.user_type,
       };
+      
+      // For students, check assessment completion status
+      if (userData.role === 'student') {
+        try {
+          const assessmentStatus = await apiService.checkAssessmentCompletion();
+          userData.assessmentCompleted = assessmentStatus.completed;
+        } catch (error) {
+          console.error('Failed to check assessment status:', error);
+          userData.assessmentCompleted = false;
+        }
+      }
       
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -137,6 +187,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         isLoading,
         error,
+        checkAssessmentStatus,
+        updateAssessmentStatus,
       }}
     >
       {children}

@@ -26,6 +26,7 @@ class StudentProfile(models.Model):
     student_id = models.CharField(max_length=20, unique=True)
     grade_level = models.CharField(max_length=20, blank=True, null=True)
     dyslexia_type = models.CharField(max_length=20, choices=DYSLEXIA_TYPE_CHOICES, default='none')
+    assessment_score = models.FloatField(null=True, blank=True, help_text="Assessment accuracy percentage (0-100)")
     learning_goals = models.TextField(blank=True, null=True)
     accommodation_notes = models.TextField(blank=True, null=True)
     parent_contact = models.EmailField(blank=True, null=True)

@@ -8,7 +8,7 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(StudentProfile)
 class StudentProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'student_id', 'grade_level', 'dyslexia_type', 'enrollment_date')
+    list_display = ('user', 'student_id', 'grade_level', 'dyslexia_type', 'assessment_score', 'enrollment_date')
     list_filter = ('grade_level', 'dyslexia_type')
     search_fields = ('user__username', 'student_id')
 
