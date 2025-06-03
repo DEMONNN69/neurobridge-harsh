@@ -120,10 +120,8 @@ def generate_assessment_questions(
           "explanation": "Tom is upset because something he worked on was destroyed."
         }}
       ]
-    }}
-
-    If the condition is "mixed":
-    Generate exactly 5 questions focused on dyslexia and 5 questions focused on autism. Mix them randomly. For dyslexia questions, focus on phonological awareness, word recognition, and comprehension. For autism questions, focus on social understanding and emotional recognition.
+    }}    If the condition is "mixed":
+    Generate exactly half the questions focused on dyslexia and half focused on autism. For {total_questions} total questions, generate {half_dyslexia} dyslexia questions and {half_autism} autism questions. Mix them randomly. For dyslexia questions, focus on phonological awareness, word recognition, and comprehension. For autism questions, focus on social understanding and emotional recognition.
     Example Output Structure:
     {{
       "condition": "mixed",
@@ -150,17 +148,21 @@ def generate_assessment_questions(
     }}
 
     Please generate a total of {total_questions} questions: {num_easy} easy, {num_moderate} moderate, and {num_hard} hard for the condition: {condition}.
-    If condition is "mixed", ensure exactly 5 questions target dyslexia-related skills and 5 questions target autism-related skills.
+    If condition is "mixed", ensure exactly half the questions target dyslexia-related skills and half target autism-related skills. For {total_questions} total questions, this means {half_dyslexia} dyslexia questions and {half_autism} autism questions.
     The question IDs should be sequential numbers starting from 1.
     Ensure the entire output is ONLY the JSON object, starting with {{ and ending with }}.
     """
 
     prompt = PromptTemplate(
         template=prompt_template_str,
-        input_variables=["condition", "num_easy", "num_moderate", "num_hard", "total_questions"]
+        input_variables=["condition", "num_easy", "num_moderate", "num_hard", "total_questions", "half_dyslexia", "half_autism"]
     )
 
     chain = LLMChain(llm=llm, prompt=prompt, output_parser=StrOutputParser())
+
+    # Calculate half values for mixed condition
+    half_dyslexia = total_questions // 2
+    half_autism = total_questions - half_dyslexia  # Handle odd numbers
 
     try:
         response = chain.invoke({
@@ -168,7 +170,9 @@ def generate_assessment_questions(
             "num_easy": num_easy,
             "num_moderate": num_moderate,
             "num_hard": num_hard,
-            "total_questions": total_questions
+            "total_questions": total_questions,
+            "half_dyslexia": half_dyslexia,
+            "half_autism": half_autism
         })
         
         # Get the response text

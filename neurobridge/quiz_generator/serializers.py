@@ -7,21 +7,25 @@ class QuizGenerationRequestSerializer(serializers.Serializer):
     condition = serializers.ChoiceField(
         choices=['dyslexia', 'autism', 'mixed'],
         default='mixed',
+        required=False,
         help_text="The condition to generate questions for. 'mixed' generates both dyslexia and autism questions."
     )
     num_easy = serializers.IntegerField(
         min_value=0,
         default=2,
+        required=False,
         help_text="Number of easy questions to generate"
     )
     num_moderate = serializers.IntegerField(
         min_value=0,
         default=4,
+        required=False,
         help_text="Number of moderate questions to generate"
     )
     num_hard = serializers.IntegerField(
         min_value=0,
         default=4,
+        required=False,
         help_text="Number of hard questions to generate"
     )
     assessment_type = serializers.ChoiceField(

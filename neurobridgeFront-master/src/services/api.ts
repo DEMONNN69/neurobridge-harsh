@@ -355,11 +355,11 @@ export interface QuizQuestion {
 }
 
 export interface QuizGenerationRequest {
-  condition: 'dyslexia' | 'autism' | 'mixed';  // Added 'mixed' option
-  num_easy: number;
-  num_moderate: number;
-  num_hard: number;
-  assessment_type?: string;  // Track user's assessment type choice
+  condition?: 'dyslexia' | 'autism' | 'mixed';  // Made optional since backend determines this
+  num_easy?: number;  // Made optional - backend sets based on assessment_type
+  num_moderate?: number;  // Made optional - backend sets based on assessment_type
+  num_hard?: number;  // Made optional - backend sets based on assessment_type
+  assessment_type: string;  // Required - user's choice from frontend
 }
 
 export interface QuizGenerationResponse {

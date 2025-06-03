@@ -108,33 +108,8 @@ const AssessmentPage: React.FC = () => {
       // Get assessment type from localStorage or default to 'both'
       const assessmentType = localStorage.getItem('assessmentType') || 'both';
       
-      // Determine condition and question counts based on assessment type
-      let condition: 'dyslexia' | 'autism' | 'mixed';
-      let numEasy: number, numModerate: number, numHard: number;
-      
-      if (assessmentType === 'dyslexia') {
-        condition = 'dyslexia';
-        numEasy = 3;
-        numModerate = 4;
-        numHard = 3;
-      } else if (assessmentType === 'autism') {
-        condition = 'autism';
-        numEasy = 3;
-        numModerate = 4;
-        numHard = 3;
-      } else {
-        // Both assessments
-        condition = 'mixed';
-        numEasy = 2;
-        numModerate = 4;
-        numHard = 4;
-      }
-      
+      // Send minimal request - let backend handle all the logic
       const response = await apiService.generateQuiz({
-        condition,
-        num_easy: numEasy,
-        num_moderate: numModerate,
-        num_hard: numHard,
         assessment_type: assessmentType
       });
       

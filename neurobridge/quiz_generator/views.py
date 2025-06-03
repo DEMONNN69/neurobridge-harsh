@@ -192,17 +192,19 @@ def submit_assessment_view(request):
 @permission_classes([IsAuthenticated])
 def generate_quiz_view(request):
     """
-    Generate a mix of 5 dyslexia and 5 autism questions for assessment.
+    Generate assessment questions based on selected assessment type.
     
     POST /api/quiz/generate/
     
     Request body:
     {
-        "condition": "mixed" (or any condition, will generate mix),
-        "num_easy": integer,
-        "num_moderate": integer, 
-        "num_hard": integer
+        "assessment_type": "dyslexia" | "autism" | "both"
     }
+    
+    Question generation logic:
+    - dyslexia: 10 questions (3 easy, 4 moderate, 3 hard)
+    - autism: 10 questions (3 easy, 4 moderate, 3 hard)  
+    - both: 20 questions (6 easy, 8 moderate, 6 hard) - 10 dyslexia + 10 autism
     
     Response includes questions with saved question_ids for tracking.
     """    # Validate request data using serializer
@@ -213,17 +215,27 @@ def generate_quiz_view(request):
             'details': serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)      # Extract validated data
     validated_data = serializer.validated_data
-    num_easy = validated_data.get('num_easy', 2)
-    num_moderate = validated_data.get('num_moderate', 4)
-    num_hard = validated_data.get('num_hard', 4)
     assessment_type = validated_data.get('assessment_type', 'both')
-      # Determine condition based on assessment type
+    
+    # Set question counts and difficulty distribution based on assessment type
     if assessment_type == 'dyslexia':
+        # 10 questions for dyslexia only
         condition = 'dyslexia'
+        num_easy = 3
+        num_moderate = 4
+        num_hard = 3
     elif assessment_type == 'autism':
+        # 10 questions for autism only
         condition = 'autism'
-    else:
+        num_easy = 3
+        num_moderate = 4
+        num_hard = 3
+    else:  # both
+        # 20 questions total (10 dyslexia + 10 autism)
         condition = 'mixed'
+        num_easy = 6
+        num_moderate = 8
+        num_hard = 6
 
     try:
         # Generate questions based on assessment type
@@ -252,7 +264,7 @@ def generate_quiz_view(request):
             return Response({
                 'error': f'Expected {expected_total} questions but got {len(questions)}',
                 'details': 'Question generation did not produce the expected count'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)          # Save questions to database and format for response
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        # Save questions to database and format for response
         dyslexia_count = 0
         autism_count = 0
         
@@ -260,20 +272,22 @@ def generate_quiz_view(request):
             # Determine condition type based on assessment type and question data
             if assessment_type == 'dyslexia':
                 condition_type = 'dyslexia'
+                dyslexia_count += 1
             elif assessment_type == 'autism':
                 condition_type = 'autism'
-            else:
-                # For 'both' assessment type, check if question has focus_area field from Gemini
+                autism_count += 1
+            else:  # both assessments
+                # For 'both' assessment type, use focus_area field from Gemini
                 if 'focus_area' in q:
                     condition_type = q['focus_area']
                 else:
                     # Fallback: alternate between dyslexia and autism to ensure mix
                     condition_type = 'dyslexia' if i % 2 == 0 else 'autism'
                 
-            if condition_type == 'dyslexia':
-                dyslexia_count += 1
-            else:
-                autism_count += 1
+                if condition_type == 'dyslexia':
+                    dyslexia_count += 1
+                else:
+                    autism_count += 1
             
             question = AssessmentQuestion.objects.create(
                 question_text=q['question'],
@@ -291,16 +305,31 @@ def generate_quiz_view(request):
                 'correct_answer': q['correct_answer'],
                 'difficulty': q.get('difficulty', 'medium'),
                 'condition': condition_type,
+                'question_type': condition_type,  # Added for frontend clarity
                 'explanation': q.get('explanation', '')
             }
             all_questions.append(formatted_question)
-        
-        # Shuffle questions for randomized order
+          # Shuffle questions for randomized order
         random.shuffle(all_questions)
         
+        # Validate question counts based on assessment type
+        expected_total = 10 if assessment_type in ['dyslexia', 'autism'] else 20
+        if len(all_questions) != expected_total:
+            return Response({
+                'error': f'Expected {expected_total} questions but got {len(all_questions)}',
+                'details': f'Question generation failed for assessment type: {assessment_type}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        # For 'both' assessment type, ensure we have questions from both conditions
+        if assessment_type == 'both':
+            if dyslexia_count == 0 or autism_count == 0:
+                return Response({
+                    'error': 'Both assessment types must have questions',
+                    'details': f'Generated {dyslexia_count} dyslexia and {autism_count} autism questions'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
         # Generate session ID for tracking
-        session_id = str(uuid.uuid4())
-          # Build response
+        session_id = str(uuid.uuid4())          # Build response
         response_data = {
             'session_id': session_id,
             'questions': all_questions,
@@ -309,8 +338,14 @@ def generate_quiz_view(request):
             'assessment_type': assessment_type,
             'dyslexia_questions': dyslexia_count,
             'autism_questions': autism_count,
+            'difficulty_distribution': {
+                'easy': num_easy,
+                'moderate': num_moderate,
+                'hard': num_hard
+            },
             'generated_at': timezone.now(),
-            'generated_by': request.user.id
+            'generated_by': request.user.id,
+            'message': f'Generated {len(all_questions)} questions for {assessment_type} assessment'
         }
 
         return Response(response_data, status=status.HTTP_200_OK)
