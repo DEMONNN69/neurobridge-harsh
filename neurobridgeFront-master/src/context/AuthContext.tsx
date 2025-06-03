@@ -62,9 +62,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             try {
               const assessmentStatus = await apiService.checkAssessmentCompletion();
               user.assessmentCompleted = assessmentStatus.completed;
+              console.log('Assessment status during auth check:', assessmentStatus.completed);
             } catch (error) {
               console.error('Failed to check assessment status during auth check:', error);
-              user.assessmentCompleted = false;
+              user.assessmentCompleted = false; // Default to false if API call fails
             }
           }
 

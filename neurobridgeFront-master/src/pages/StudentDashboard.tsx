@@ -32,25 +32,35 @@ const StudentDashboard: React.FC = () => {
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [learningProgress, setLearningProgress] = useState<Progress[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
+  const [dataLoaded, setDataLoaded] = useState(false); // Track if data has been loaded
 
   useEffect(() => {
     const loadDashboard = async () => {
-      // Clear refresh/assessment_completed parameters if present
-      if (searchParams.get('refresh') || searchParams.get('assessment_completed')) {
-        setSearchParams({}, { replace: true });
+      // Only fetch data if not already loaded
+      if (!dataLoaded) {
+        await fetchDashboardData();
       }
-      
-      // Fetch dashboard data
-      await fetchDashboardData();
     };
     
     loadDashboard();
-  }, []); // Run only once on mount
+  }, [dataLoaded]); // Run only once on mount or when dataLoaded changes
+
+  useEffect(() => {
+    // Clear refresh/assessment_completed parameters if present (separate effect to avoid infinite loop)
+    if (searchParams.get('refresh') || searchParams.get('assessment_completed')) {
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('refresh');
+      newSearchParams.delete('assessment_completed');
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]); // Only run when search params change
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      console.log('Starting dashboard data fetch...');
 
       // Fetch all dashboard data in parallel
       const [
@@ -67,35 +77,95 @@ const StudentDashboard: React.FC = () => {
         apiService.getStudentDashboardStats()
       ]);
 
+      // Log the results for debugging
+      console.log('Dashboard API Results:', {
+        studentProfile: studentProfileData.status === 'fulfilled' ? studentProfileData.value : studentProfileData.reason,
+        achievements: achievementsData.status === 'fulfilled' ? achievementsData.value : achievementsData.reason,
+        progress: progressData.status === 'fulfilled' ? progressData.value : progressData.reason,
+        tasks: tasksData.status === 'fulfilled' ? tasksData.value : tasksData.reason,
+        stats: statsData.status === 'fulfilled' ? statsData.value : statsData.reason,
+      });
+
       // Handle studentProfile
       if (studentProfileData.status === 'fulfilled') {
+        console.log('Student profile data:', studentProfileData.value);
         setStudentProfile(studentProfileData.value);
+      } else {
+        console.error('Student profile failed:', studentProfileData.reason);
       }
 
       // Handle achievements
       if (achievementsData.status === 'fulfilled') {
-        setAchievements(achievementsData.value);
+        const achievements = achievementsData.value;
+        console.log('Achievements data:', achievements);
+        
+        if (Array.isArray(achievements)) {
+          setAchievements(achievements);
+        } else if (achievements && typeof achievements === 'object' && 'results' in achievements && Array.isArray((achievements as any).results)) {
+          // Handle paginated response format {count, next, previous, results}
+          console.log('Extracted achievements from paginated response:', (achievements as any).results);
+          setAchievements((achievements as any).results);
+        } else {
+          console.warn('Achievements API did not return an array or paginated response:', achievements);
+          setAchievements([]);
+        }
+      } else {
+        console.error('Achievements failed:', achievementsData.reason);
       }
 
       // Handle learning progress
       if (progressData.status === 'fulfilled') {
-        setLearningProgress(progressData.value);
+        const progress = progressData.value;
+        console.log('Progress data:', progress);
+        
+        if (Array.isArray(progress)) {
+          setLearningProgress(progress);
+        } else if (progress && typeof progress === 'object' && 'results' in progress && Array.isArray((progress as any).results)) {
+          // Handle paginated response format {count, next, previous, results}
+          console.log('Extracted progress from paginated response:', (progress as any).results);
+          setLearningProgress((progress as any).results);
+        } else {
+          console.warn('Progress API did not return an array or paginated response:', progress);
+          setLearningProgress([]);
+        }
+      } else {
+        console.error('Progress failed:', progressData.reason);
       }
 
       // Handle upcoming tasks
       if (tasksData.status === 'fulfilled') {
         const tasks = tasksData.value;
+        console.log('Tasks data:', tasks, 'Type:', typeof tasks, 'Is array:', Array.isArray(tasks));
+        
+        let tasksArray: Task[] = [];
+        
+        if (Array.isArray(tasks)) {
+          tasksArray = tasks;
+        } else if (tasks && typeof tasks === 'object' && 'results' in tasks && Array.isArray((tasks as any).results)) {
+          // Handle paginated response format {count, next, previous, results}
+          console.log('Extracted tasks from paginated response:', (tasks as any).results);
+          tasksArray = (tasks as any).results;
+        } else {
+          console.warn('Tasks API did not return an array or paginated response:', tasks);
+        }
+        
         // Filter for upcoming tasks and sort by due date
-        const upcoming = tasks
+        const upcoming = tasksArray
           .filter((task: Task) => task.status !== 'completed' && new Date(task.due_date) > new Date())
           .sort((a: Task, b: Task) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
           .slice(0, 5); // Show only next 5 tasks
+          
         setUpcomingTasks(upcoming);
+      } else {
+        console.error('Tasks failed:', tasksData.reason);
       }
 
       // Handle dashboard stats
       if (statsData.status === 'fulfilled') {
+        console.log('Stats data:', statsData.value);
         setDashboardStats(statsData.value);
+      } else {
+        console.error('Stats failed:', statsData.reason);
       }
 
     } catch (err) {
@@ -103,7 +173,14 @@ const StudentDashboard: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
     } finally {
       setLoading(false);
+      setDataLoaded(true); // Mark data as loaded regardless of success/failure
     }
+  };
+
+  const refreshDashboard = async () => {
+    setDataLoaded(false); // Reset the data loaded flag to trigger a refresh
+    setError(null);
+    await fetchDashboardData();
   };
 
   const formatDueDate = (dueDate: string) => {
@@ -144,7 +221,7 @@ const StudentDashboard: React.FC = () => {
             {error}
           </p>
           <button
-            onClick={fetchDashboardData}
+            onClick={refreshDashboard}
             className="mt-3 bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700 transition-colors"
           >
             Try Again
@@ -193,6 +270,89 @@ const StudentDashboard: React.FC = () => {
 
               {!loading && !error && (
                 <>
+                  {/* Quick Stats Overview */}
+                  <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                      <div className="p-5">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <BookOpen className="h-6 w-6 text-indigo-600" />
+                          </div>
+                          <div className="ml-5 w-0 flex-1">
+                            <dl>
+                              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                Learning Progress
+                              </dt>
+                              <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                                {learningProgress.length} courses
+                              </dd>
+                            </dl>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                      <div className="p-5">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <Award className="h-6 w-6 text-purple-600" />
+                          </div>
+                          <div className="ml-5 w-0 flex-1">
+                            <dl>
+                              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                Achievements
+                              </dt>
+                              <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                                {achievements.length} earned
+                              </dd>
+                            </dl>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                      <div className="p-5">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <Clock className="h-6 w-6 text-yellow-600" />
+                          </div>
+                          <div className="ml-5 w-0 flex-1">
+                            <dl>
+                              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                Pending Tasks
+                              </dt>
+                              <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                                {upcomingTasks.length} tasks
+                              </dd>
+                            </dl>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
+                      <div className="p-5">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <TrendingUp className="h-6 w-6 text-green-600" />
+                          </div>
+                          <div className="ml-5 w-0 flex-1">
+                            <dl>
+                              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                                Total Points
+                              </dt>
+                              <dd className="text-lg font-medium text-gray-900 dark:text-white">
+                                {dashboardStats?.total_points || 0}
+                              </dd>
+                            </dl>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Learning Progress */}
                   <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
                     <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
@@ -247,11 +407,31 @@ const StudentDashboard: React.FC = () => {
                         </div>
                       </>
                     ) : (
-                      <EmptyState
-                        title="No Learning Progress Yet"
-                        description="Start learning by enrolling in courses to see your progress here."
-                        icon={BookOpen}
-                      />
+                      <>
+                        <EmptyState
+                          title="No Learning Progress Yet"
+                          description="Start your learning journey by exploring available courses."
+                          icon={BookOpen}
+                        />
+                        <div className="px-4 py-3 sm:px-6 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex flex-col sm:flex-row gap-3">
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                              <BookOpen className="mr-2 h-4 w-4" />
+                              Browse Courses
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              View Scheduler
+                            </button>
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
 
@@ -305,11 +485,22 @@ const StudentDashboard: React.FC = () => {
                           </div>
                         </>
                       ) : (
-                        <EmptyState
-                          title="No Upcoming Tasks"
-                          description="You're all caught up! New tasks will appear here when they're assigned."
-                          icon={Clock}
-                        />
+                        <>
+                          <EmptyState
+                            title="No Upcoming Tasks"
+                            description="Stay organized by creating your first task or exploring the scheduler."
+                            icon={Clock}
+                          />
+                          <div className="px-4 py-3 sm:px-6 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                              type="button"
+                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+                            >
+                              <Calendar className="mr-2 h-5 w-5" />
+                              Create Task
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
 
@@ -361,11 +552,22 @@ const StudentDashboard: React.FC = () => {
                           </div>
                         </>
                       ) : (
-                        <EmptyState
-                          title="No Achievements Yet"
-                          description="Complete lessons and tasks to earn your first achievement!"
-                          icon={Award}
-                        />
+                        <>
+                          <EmptyState
+                            title="No Achievements Yet"
+                            description="Complete lessons and tasks to unlock your first achievement!"
+                            icon={Award}
+                          />
+                          <div className="px-4 py-3 sm:px-6 border-t border-gray-200 dark:border-gray-700">
+                            <button
+                              type="button"
+                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                            >
+                              <BookOpen className="mr-2 h-5 w-5" />
+                              Start Learning
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>

@@ -34,7 +34,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // Check assessment completion for students accessing dashboard/main content
-  if (user && user.role === 'student' && requireAssessment && !user.assessmentCompleted) {
+  if (user && user.role === 'student' && requireAssessment && user.assessmentCompleted === false) {
     return <Navigate to="/assessment" replace />;
   }
 

@@ -590,11 +590,10 @@ class ApiService {
 
   async checkNeedsAssessment(): Promise<boolean> {
     try {
-      const studentProfile = await this.getStudentProfile();
-      // If dyslexia_type is 'none' or not set, student needs assessment
-      return !studentProfile.dyslexia_type || studentProfile.dyslexia_type === 'none';
+      const response = await this.checkAssessmentCompletion();
+      return !response.completed;
     } catch (error) {
-      // If profile doesn't exist or there's an error, assume assessment is needed
+      // If there's an error, assume assessment is needed
       return true;
     }
   }

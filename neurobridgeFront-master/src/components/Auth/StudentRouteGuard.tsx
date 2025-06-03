@@ -1,33 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
-import { apiService } from '../../services/api';
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 interface StudentRouteGuardProps {
   children: React.ReactNode;
 }
 
 const StudentRouteGuard: React.FC<StudentRouteGuardProps> = ({ children }) => {
-  const [needsAssessment, setNeedsAssessment] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
 
-  useEffect(() => {
-    checkAssessmentStatus();
-  }, []);
+  // If user is not a student, this guard should not apply
+  if (!isLoading && (!user || user.role !== 'student')) {
+    return <>{children}</>;
+  }
 
-  const checkAssessmentStatus = async () => {
-    try {
-      const needs = await apiService.checkNeedsAssessment();
-      setNeedsAssessment(needs);
-    } catch (error) {
-      console.error('Error checking assessment status:', error);
-      // If there's an error, assume assessment is needed
-      setNeedsAssessment(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -35,13 +23,17 @@ const StudentRouteGuard: React.FC<StudentRouteGuardProps> = ({ children }) => {
     );
   }
 
+  // Use the assessment status from the auth context instead of making additional API calls
+  const isOnAssessmentPage = location.pathname === '/assessment';
+  const needsAssessment = user?.assessmentCompleted === false;
+
   // If student needs assessment and is not already on assessment page
-  if (needsAssessment && window.location.pathname !== '/assessment') {
+  if (needsAssessment && !isOnAssessmentPage) {
     return <Navigate to="/assessment" replace />;
   }
 
   // If student doesn't need assessment and is on assessment page, redirect to dashboard
-  if (!needsAssessment && window.location.pathname === '/assessment') {
+  if (!needsAssessment && isOnAssessmentPage) {
     return <Navigate to="/student/dashboard" replace />;
   }
 
