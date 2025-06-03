@@ -11,7 +11,7 @@ class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
         fields = '__all__'
-        read_only_fields = ('user', 'enrollment_date')
+        read_only_fields = ('user', 'enrollment_date', 'dyslexia_prediction_level', 'dyslexia_prediction_confidence', 'dyslexia_prediction_date')
 
 class TeacherProfileSerializer(serializers.ModelSerializer):
     class Meta:

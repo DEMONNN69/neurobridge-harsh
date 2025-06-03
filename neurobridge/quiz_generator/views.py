@@ -144,7 +144,6 @@ def submit_assessment_view(request):
             start_time = timing_data.get('start_time', 0)
             end_time = timing_data.get('end_time', 0)
             response_time = timing_data.get('response_time', 0)
-            
             try:
                 question = AssessmentQuestion.objects.get(question_id=question_id)
                 QuestionTiming.objects.create(
@@ -157,7 +156,8 @@ def submit_assessment_view(request):
             except AssessmentQuestion.DoesNotExist:
                 print(f"Question with ID {question_id} not found for timing data")
                 continue
-          # Update student profile with corrected assessment score and separate scores
+        
+        # Update student profile with corrected assessment score and separate scores
         student_profile, created = StudentProfile.objects.get_or_create(
             user=request.user,
             defaults={'student_id': f'STU{request.user.id:06d}'}
@@ -167,6 +167,14 @@ def submit_assessment_view(request):
         student_profile.dyslexia_score = dyslexia_score
         student_profile.autism_score = autism_score
         student_profile.save()
+        
+        # Trigger dyslexia prediction asynchronously if assessment includes dyslexia
+        if assessment_type in ['dyslexia', 'both']:
+            from .dyslexia_predictor import run_dyslexia_prediction_async
+            try:
+                run_dyslexia_prediction_async(session.id)
+            except Exception as e:
+                print(f"Dyslexia prediction failed: {e}")  # Log but don't fail assessment
         
         return Response({
             'session_id': str(session.session_id),

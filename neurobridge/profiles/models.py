@@ -35,11 +35,15 @@ class StudentProfile(models.Model):
     
     # Assessment type chosen by user
     assessment_type = models.CharField(max_length=20, choices=ASSESSMENT_TYPE_CHOICES, null=True, blank=True)
-    
-    # Separate scores for each assessment type
+      # Separate scores for each assessment type
     assessment_score = models.FloatField(null=True, blank=True, help_text="Overall assessment accuracy percentage (0-100)")
     dyslexia_score = models.FloatField(null=True, blank=True, help_text="Dyslexia assessment score (0-100)")
     autism_score = models.FloatField(null=True, blank=True, help_text="Autism assessment score (0-100)")
+    
+    # XGBoost dyslexia prediction results
+    dyslexia_prediction_level = models.CharField(max_length=20, null=True, blank=True, help_text="Predicted dyslexia level (Low, Moderate, High)")
+    dyslexia_prediction_confidence = models.FloatField(null=True, blank=True, help_text="Prediction confidence score (0-1)")
+    dyslexia_prediction_date = models.DateTimeField(null=True, blank=True, help_text="When the prediction was made")
     
     learning_goals = models.TextField(blank=True, null=True)
     accommodation_notes = models.TextField(blank=True, null=True)
