@@ -108,6 +108,83 @@ class DyslexiaLevelPredictor:
 # Global instance
 predictor = DyslexiaLevelPredictor()
 
+def run_both_predictions_async(assessment_session_id):
+    """
+    Unified function to run both dyslexia and autism predictions for assessments that include both types.
+    
+    Args:
+        assessment_session_id: ID of the completed assessment session
+    """
+    from .models import AssessmentSession
+    from profiles.models import StudentProfile
+    from django.utils import timezone
+    
+    # Import autism_predictor here to avoid circular import
+    try:
+        from .autism_predictor import autism_predictor
+    except ImportError as e:
+        print(f"Failed to import autism_predictor: {e}")
+        autism_predictor = None
+    
+    try:
+        # Get the assessment session
+        session = AssessmentSession.objects.get(id=assessment_session_id)
+        
+        # Only run if assessment type is 'both'
+        if session.assessment_type != 'both':
+            return
+        
+        # Extract responses separated by condition type
+        dyslexia_responses = []
+        autism_responses = []
+        
+        for response in session.responses.all():
+            response_data = {
+                'difficulty_level': response.question.difficulty_level,
+                'response_time': response.response_time or 30.0,  # Default if not recorded
+                'is_correct': response.is_correct
+            }
+            
+            if response.question.condition_type == 'dyslexia':
+                dyslexia_responses.append(response_data)
+            elif response.question.condition_type == 'autism':
+                autism_responses.append(response_data)
+        
+        # Get or create student profile
+        student_profile, created = StudentProfile.objects.get_or_create(
+            user=session.user,
+            defaults={'student_id': f'STU{session.user.id:06d}'}
+        )
+        
+        # Run dyslexia prediction if we have dyslexia responses
+        if dyslexia_responses:
+            dyslexia_result = predictor.predict_dyslexia_level(dyslexia_responses)
+            student_profile.dyslexia_prediction_level = dyslexia_result['predicted_level']
+            student_profile.dyslexia_prediction_confidence = dyslexia_result['confidence']
+            student_profile.dyslexia_prediction_date = timezone.now()
+          # Run autism prediction if we have autism responses and autism_predictor is available
+        if autism_responses and autism_predictor is not None:
+            autism_result = autism_predictor.predict_autism_level(autism_responses)
+            student_profile.autism_prediction_level = autism_result['predicted_level']
+            student_profile.autism_prediction_confidence = autism_result['confidence']
+            student_profile.autism_prediction_date = timezone.now()
+        elif autism_responses and autism_predictor is None:
+            print("Autism predictor not available, skipping autism prediction")
+        
+        # Save the updated profile
+        student_profile.save()
+        
+        print(f"Both predictions completed for session {assessment_session_id}")
+        if dyslexia_responses:
+            print(f"Dyslexia: {student_profile.dyslexia_prediction_level} (confidence: {student_profile.dyslexia_prediction_confidence:.2f})")
+        if autism_responses:
+            print(f"Autism: {student_profile.autism_prediction_level} (confidence: {student_profile.autism_prediction_confidence:.2f})")
+            
+    except Exception as e:
+        # Log error but don't raise to avoid breaking the main flow
+        print(f"Error in dual prediction: {e}")
+        pass
+
 def run_dyslexia_prediction_async(assessment_session_id):
     """
     Asynchronous function to run dyslexia prediction for a completed assessment.

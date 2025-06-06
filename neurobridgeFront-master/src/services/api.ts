@@ -40,7 +40,21 @@ export interface StudentProfile {
   student_id: string;
   grade_level?: string;
   dyslexia_type: 'phonological' | 'surface' | 'visual' | 'mixed' | 'none';
+  assessment_type?: 'dyslexia' | 'autism' | 'both';
   assessment_score?: number;
+  dyslexia_score?: number;
+  autism_score?: number;
+  
+  // XGBoost dyslexia prediction results
+  dyslexia_prediction_level?: string;
+  dyslexia_prediction_confidence?: number;
+  dyslexia_prediction_date?: string;
+  
+  // XGBoost autism prediction results
+  autism_prediction_level?: string;
+  autism_prediction_confidence?: number;
+  autism_prediction_date?: string;
+  
   learning_goals?: string;
   accommodation_notes?: string;
   parent_contact?: string;
@@ -428,6 +442,15 @@ export interface AssessmentResult {
   message: string;
 }
 
+// Combined assessment interfaces
+export interface CombinedAssessmentSubmission {
+  dyslexia_session_id: string;
+  autism_session_id: string;
+  dyslexia_answers: AssessmentAnswer[];
+  autism_answers: AssessmentAnswer[];
+  total_assessment_time: number;
+}
+
 class ApiService {
   private getHeaders(includeAuth: boolean = false): HeadersInit {
     const headers: HeadersInit = {
@@ -629,6 +652,12 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
+  //   async createTeacherProfile(data: Partial<TeacherProfile>): Promise<TeacherProfile> {
+  //   return this.authenticatedRequest('/profiles/teacher/', {
+  //     method: 'POST',
+  //     body: JSON.stringify(data),
+  //   });
+  // }
 
   async checkTeacherProfileCompletion(): Promise<{ completed: boolean; profile?: TeacherProfile }> {
     return this.authenticatedRequest('/profiles/teacher/profile-completion/');
@@ -943,9 +972,15 @@ class ApiService {
   async getQuizInfo(): Promise<QuizInfo> {
     return this.authenticatedRequest('/quiz/info/');
   }
-
   async submitAssessment(data: AssessmentSubmission): Promise<AssessmentResult> {
     return this.authenticatedRequest('/quiz/submit/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async submitCombinedAssessment(data: CombinedAssessmentSubmission): Promise<AssessmentResult> {
+    return this.authenticatedRequest('/quiz/submit-combined/', {
       method: 'POST',
       body: JSON.stringify(data),
     });

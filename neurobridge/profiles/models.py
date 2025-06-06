@@ -45,6 +45,11 @@ class StudentProfile(models.Model):
     dyslexia_prediction_confidence = models.FloatField(null=True, blank=True, help_text="Prediction confidence score (0-1)")
     dyslexia_prediction_date = models.DateTimeField(null=True, blank=True, help_text="When the prediction was made")
     
+    # XGBoost autism prediction results
+    autism_prediction_level = models.CharField(max_length=20, null=True, blank=True, help_text="Predicted autism level (Low, Moderate, High)")
+    autism_prediction_confidence = models.FloatField(null=True, blank=True, help_text="Prediction confidence score (0-1)")
+    autism_prediction_date = models.DateTimeField(null=True, blank=True, help_text="When the prediction was made")
+    
     learning_goals = models.TextField(blank=True, null=True)
     accommodation_notes = models.TextField(blank=True, null=True)
     parent_contact = models.EmailField(blank=True, null=True)
