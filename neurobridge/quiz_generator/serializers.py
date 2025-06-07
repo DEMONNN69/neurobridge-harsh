@@ -34,7 +34,46 @@ class QuizGenerationRequestSerializer(serializers.Serializer):
         required=False,
         help_text="Type of assessment chosen by user"
     )
-
+    
+    # Pre-assessment data fields
+    age = serializers.IntegerField(
+        min_value=3,
+        max_value=100,
+        required=False,
+        help_text="Student's age"
+    )
+    grade = serializers.CharField(
+        max_length=50,
+        required=False,
+        help_text="Student's grade level"
+    )
+    reading_level = serializers.CharField(
+        max_length=100,
+        required=False,
+        help_text="Student's reading proficiency level"
+    )
+    primary_language = serializers.CharField(
+        max_length=50,
+        default='English',
+        required=False,
+        help_text="Student's primary language"
+    )
+    has_reading_difficulty = serializers.BooleanField(
+        default=False,
+        required=False,
+        help_text="Whether student has difficulty reading"
+    )
+    needs_assistance = serializers.BooleanField(
+        default=False,
+        required=False,
+        help_text="Whether student may need assistance during assessment"
+    )
+    previous_assessment = serializers.BooleanField(
+        default=False,
+        required=False,
+        help_text="Whether student has taken similar assessment before"
+    )    
+    
     def validate(self, data):
         """Custom validation to ensure at least one question is requested and not too many."""
         total_questions = data['num_easy'] + data['num_moderate'] + data['num_hard']
@@ -50,6 +89,64 @@ class QuizGenerationRequestSerializer(serializers.Serializer):
             )
         
         return data
+    
+    def get_customized_difficulty_distribution(self):
+        """
+        Adjust difficulty distribution based on pre-assessment data.
+        Returns a dictionary with customized question counts.
+        """
+        data = self.validated_data
+        age = data.get('age', 10)
+        reading_level = data.get('reading_level', '')
+        has_reading_difficulty = data.get('has_reading_difficulty', False)
+        assessment_type = data.get('assessment_type', 'both')
+        
+        # Base question counts
+        if assessment_type in ['dyslexia', 'autism']:
+            base_total = 10
+        else:  # both
+            base_total = 20
+        
+        # Adjust difficulty based on age and reading level
+        if age < 7 or reading_level in ['Cannot read yet', 'Beginning reader (simple words)']:
+            # More easy questions for young children or non-readers
+            if base_total == 10:
+                return {'easy': 6, 'moderate': 3, 'hard': 1}
+            else:  # 20 questions
+                return {'easy': 12, 'moderate': 6, 'hard': 2}
+        
+        elif age < 12 or reading_level == 'Early reader (simple sentences)':
+            # Slightly easier distribution for younger students
+            if base_total == 10:
+                return {'easy': 4, 'moderate': 4, 'hard': 2}
+            else:  # 20 questions
+                return {'easy': 8, 'moderate': 8, 'hard': 4}
+        
+        elif has_reading_difficulty:
+            # More easy and moderate questions for students with reading difficulties
+            if base_total == 10:
+                return {'easy': 4, 'moderate': 5, 'hard': 1}
+            else:  # 20 questions
+                return {'easy': 8, 'moderate': 10, 'hard': 2}
+        
+        else:
+            # Standard distribution for typical students
+            if base_total == 10:
+                return {'easy': 3, 'moderate': 4, 'hard': 3}
+            else:  # 20 questions
+                return {'easy': 6, 'moderate': 8, 'hard': 6}
+    
+    def should_use_visual_assessment(self):
+        """
+        Determine if visual/interactive assessment should be recommended.
+        """
+        data = self.validated_data
+        age = data.get('age', 10)
+        reading_level = data.get('reading_level', '')
+        
+        return (age < 7 or 
+                reading_level in ['Cannot read yet', 'Beginning reader (simple words)'] or
+                data.get('needs_assistance', False))
 
 class QuestionSerializer(serializers.Serializer):
     """Serializer for individual quiz questions."""

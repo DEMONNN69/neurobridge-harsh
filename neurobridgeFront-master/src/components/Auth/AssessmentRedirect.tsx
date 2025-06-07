@@ -9,13 +9,21 @@ const AssessmentRedirect: React.FC = () => {
   if (!user || user.role !== 'student') {
     return <Navigate to="/dashboard" replace />;
   }
-
   // If assessment is already completed, redirect to dashboard
   if (user.assessmentCompleted) {
     return <Navigate to="/student/dashboard" replace />;
   }
-  // Redirect to assessment type selection
-  return <Navigate to="/student/assessment-type" replace />;
+  
+  // Check if pre-assessment data exists
+  const preAssessmentData = localStorage.getItem('preAssessmentData');
+  
+  if (!preAssessmentData) {
+    // Redirect to pre-assessment form first
+    return <Navigate to="/student/pre-assessment" replace />;
+  }
+  
+  // If pre-assessment is done, redirect to assessment type selection
+  return <Navigate to="/student/assessment-type-selection" replace />;
 };
 
 export default AssessmentRedirect;

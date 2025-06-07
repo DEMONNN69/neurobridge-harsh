@@ -10,6 +10,7 @@ import SchedulerPage from './pages/SchedulerPage';
 import AccessibilityPage from './pages/AccessibilityPage';
 import ChatbotPage from './pages/ChatbotPage';
 import AssessmentRedirect from './components/Auth/AssessmentRedirect';
+import PreAssessmentForm from './pages/PreAssessmentForm';
 import AssessmentTypeSelection from './pages/AssessmentTypeSelection';
 import AssessmentPage from './pages/AssessmentPage';
 import TeacherProfileSetup from './pages/TeacherProfileSetup';
@@ -43,6 +44,18 @@ function App() {
         <Route path="/assessment" element={
           <ProtectedRoute allowedRoles={['student']}>
             {() => <AssessmentRedirect />}
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/student/pre-assessment" element={
+          <ProtectedRoute allowedRoles={['student']}>
+            {() => <PreAssessmentForm />}
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/student/assessment-type-selection" element={
+          <ProtectedRoute allowedRoles={['student']}>
+            {() => <AssessmentTypeSelection />}
           </ProtectedRoute>
         } />
         

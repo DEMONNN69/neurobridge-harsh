@@ -50,12 +50,14 @@ def submit_assessment_view(request):
         return Response({
             'error': 'Assessment answers and total questions are required'
         }, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Calculate accuracy percentage
+      # Calculate accuracy percentage
     accuracy = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
     
     try:
-        # Create assessment session with timing data
+        # Get pre-assessment data if available
+        pre_assessment_data = request.data.get('pre_assessment_data', {})
+        
+        # Create assessment session with timing data and pre-assessment info
         session = AssessmentSession.objects.create(
             user=request.user,
             assessment_type=assessment_type,
@@ -63,10 +65,23 @@ def submit_assessment_view(request):
             correct_answers=correct_answers,
             accuracy_percentage=accuracy,
             total_assessment_time=total_assessment_time,
+            # Pre-assessment data fields
+            student_age=pre_assessment_data.get('age'),
+            student_grade=pre_assessment_data.get('grade'),
+            reading_level=pre_assessment_data.get('reading_level'),
+            primary_language=pre_assessment_data.get('primary_language', 'English'),
+            has_reading_difficulty=pre_assessment_data.get('has_reading_difficulty', False),
+            needs_assistance=pre_assessment_data.get('needs_assistance', False),
+            previous_assessment=pre_assessment_data.get('previous_assessment', False),
+            difficulty_customized=pre_assessment_data.get('difficulty_customized', False),
+            customization_reason=pre_assessment_data.get('customization_reason'),
+            visual_assessment_recommended=pre_assessment_data.get('visual_assessment_recommended', False),
             # Assign random values for now (AI model will update these later)
             predicted_dyslexic_type=random.choice(['phonological', 'surface', 'mixed', 'rapid_naming', 'double_deficit']),
             predicted_severity=random.choice(['mild', 'moderate', 'severe'])
-        )        # Save individual responses for AI analysis
+        )
+        
+        # Save individual responses for AI analysis
         wrong_questions = []
         backend_correct_count = 0  # Recalculate based on backend verification
         
@@ -236,29 +251,35 @@ def generate_quiz_view(request):
         return Response({
             'error': 'Invalid request data',
             'details': serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)      # Extract validated data
+        }, status=status.HTTP_400_BAD_REQUEST)    # Extract validated data
     validated_data = serializer.validated_data
     assessment_type = validated_data.get('assessment_type', 'both')
     
-    # Set question counts and difficulty distribution based on assessment type
+    # Get customized difficulty distribution based on pre-assessment data
+    custom_distribution = serializer.get_customized_difficulty_distribution()
+    num_easy = custom_distribution['easy']
+    num_moderate = custom_distribution['moderate']
+    num_hard = custom_distribution['hard']
+    
+    # Set condition based on assessment type
     if assessment_type == 'dyslexia':
-        # 10 questions for dyslexia only
         condition = 'dyslexia'
-        num_easy = 3
-        num_moderate = 4
-        num_hard = 3
     elif assessment_type == 'autism':
-        # 10 questions for autism only
         condition = 'autism'
-        num_easy = 3
-        num_moderate = 4
-        num_hard = 3
     else:  # both
-        # 20 questions total (10 dyslexia + 10 autism)
         condition = 'mixed'
-        num_easy = 6
-        num_moderate = 8
-        num_hard = 6
+    
+    # Check if visual assessment is recommended
+    use_visual_assessment = serializer.should_use_visual_assessment()
+    
+    # Log pre-assessment customization for debugging
+    print(f"Pre-assessment customization applied:")
+    print(f"  Age: {validated_data.get('age', 'Not provided')}")
+    print(f"  Reading level: {validated_data.get('reading_level', 'Not provided')}")
+    print(f"  Has reading difficulty: {validated_data.get('has_reading_difficulty', False)}")
+    print(f"  Needs assistance: {validated_data.get('needs_assistance', False)}")
+    print(f"  Customized distribution: Easy={num_easy}, Moderate={num_moderate}, Hard={num_hard}")
+    print(f"  Visual assessment recommended: {use_visual_assessment}")
 
     try:
         # Generate questions based on assessment type
@@ -352,7 +373,7 @@ def generate_quiz_view(request):
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         # Generate session ID for tracking
-        session_id = str(uuid.uuid4())          # Build response
+        session_id = str(uuid.uuid4())        # Build response
         response_data = {
             'session_id': session_id,
             'questions': all_questions,
@@ -366,11 +387,23 @@ def generate_quiz_view(request):
                 'moderate': num_moderate,
                 'hard': num_hard
             },
+            'pre_assessment_data': {
+                'age': validated_data.get('age'),
+                'grade': validated_data.get('grade'),
+                'reading_level': validated_data.get('reading_level'),
+                'primary_language': validated_data.get('primary_language'),
+                'has_reading_difficulty': validated_data.get('has_reading_difficulty', False),
+                'needs_assistance': validated_data.get('needs_assistance', False),
+                'previous_assessment': validated_data.get('previous_assessment', False)
+            },            'recommendations': {
+                'use_visual_assessment': use_visual_assessment,
+                'difficulty_customized': True,
+                'customization_reason': _get_customization_reason(validated_data)
+            },
             'generated_at': timezone.now(),
             'generated_by': request.user.id,
-            'message': f'Generated {len(all_questions)} questions for {assessment_type} assessment'
-        }
-
+            'message': f'Generated {len(all_questions)} questions for {assessment_type} assessment (customized based on pre-assessment data)'
+        }        
         return Response(response_data, status=status.HTTP_200_OK)
 
     except Exception as e:
@@ -379,6 +412,21 @@ def generate_quiz_view(request):
             'error': 'An unexpected server error occurred',
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+def _get_customization_reason(validated_data):
+    """Helper function to explain why difficulty was customized."""
+    age = validated_data.get('age', 10)
+    reading_level = validated_data.get('reading_level', '')
+    has_reading_difficulty = validated_data.get('has_reading_difficulty', False)
+    
+    if age < 7 or reading_level in ['Cannot read yet', 'Beginning reader (simple words)']:
+        return "Adjusted for young age or beginning reading level"
+    elif age < 12 or reading_level == 'Early reader (simple sentences)':
+        return "Adjusted for younger student or early reading level"
+    elif has_reading_difficulty:
+        return "Adjusted for reported reading difficulties"
+    else:
+        return "Standard distribution for typical student profile"
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -525,6 +573,8 @@ def submit_combined_assessment_view(request):
         dyslexia_score = (dyslexia_correct / dyslexia_total * 100) if dyslexia_total > 0 else 0
         autism_score = (autism_correct / autism_total * 100) if autism_total > 0 else 0
         overall_accuracy = (backend_correct_count / total_questions * 100) if total_questions > 0 else 0
+          # Get pre-assessment data if available
+        pre_assessment_data = request.data.get('pre_assessment_data', {})
         
         # Create combined assessment session
         session = AssessmentSession.objects.create(
@@ -536,6 +586,17 @@ def submit_combined_assessment_view(request):
             dyslexia_score=dyslexia_score,
             autism_score=autism_score,
             total_assessment_time=total_assessment_time,
+            # Pre-assessment data fields
+            student_age=pre_assessment_data.get('age'),
+            student_grade=pre_assessment_data.get('grade'),
+            reading_level=pre_assessment_data.get('reading_level'),
+            primary_language=pre_assessment_data.get('primary_language', 'English'),
+            has_reading_difficulty=pre_assessment_data.get('has_reading_difficulty', False),
+            needs_assistance=pre_assessment_data.get('needs_assistance', False),
+            previous_assessment=pre_assessment_data.get('previous_assessment', False),
+            difficulty_customized=pre_assessment_data.get('difficulty_customized', False),
+            customization_reason=pre_assessment_data.get('customization_reason'),
+            visual_assessment_recommended=pre_assessment_data.get('visual_assessment_recommended', False),
             predicted_dyslexic_type=random.choice(['phonological', 'surface', 'mixed', 'rapid_naming', 'double_deficit']),
             predicted_severity=random.choice(['mild', 'moderate', 'severe'])
         )

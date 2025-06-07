@@ -53,12 +53,25 @@ class AssessmentSession(models.Model):
     total_questions = models.IntegerField()
     correct_answers = models.IntegerField()
     accuracy_percentage = models.FloatField()
-    
-    # Separate scores for each condition
+      # Separate scores for each condition
     dyslexia_score = models.FloatField(null=True, blank=True, help_text="Score for dyslexia questions only")
     autism_score = models.FloatField(null=True, blank=True, help_text="Score for autism questions only")
     
     total_assessment_time = models.IntegerField(default=0)  # Total time in seconds
+    
+    # Pre-assessment data fields
+    student_age = models.IntegerField(null=True, blank=True, help_text="Student's age at time of assessment")
+    student_grade = models.CharField(max_length=50, null=True, blank=True, help_text="Student's current grade level")
+    reading_level = models.CharField(max_length=100, null=True, blank=True, help_text="Student's reading proficiency level")
+    primary_language = models.CharField(max_length=50, null=True, blank=True, default='English', help_text="Student's primary language")
+    has_reading_difficulty = models.BooleanField(default=False, help_text="Whether student has known reading difficulties")
+    needs_assistance = models.BooleanField(default=False, help_text="Whether student needs assistance during assessment")
+    previous_assessment = models.BooleanField(default=False, help_text="Whether student has taken similar assessments before")
+    
+    # Customization metadata
+    difficulty_customized = models.BooleanField(default=False, help_text="Whether difficulty distribution was customized")
+    customization_reason = models.TextField(null=True, blank=True, help_text="Reason for difficulty customization")
+    visual_assessment_recommended = models.BooleanField(default=False, help_text="Whether visual assessment was recommended")
     
     # AI model will analyze these later
     predicted_dyslexic_type = models.CharField(max_length=30, choices=DYSLEXIC_TYPE_CHOICES, null=True, blank=True)

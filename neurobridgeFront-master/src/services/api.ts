@@ -374,6 +374,15 @@ export interface QuizGenerationRequest {
   num_moderate?: number;  // Made optional - backend sets based on assessment_type
   num_hard?: number;  // Made optional - backend sets based on assessment_type
   assessment_type: string;  // Required - user's choice from frontend
+  
+  // Pre-assessment data fields for customization
+  age?: number;  // Student's age (3-100)
+  grade?: string;  // Student's grade level
+  reading_level?: string;  // Student's reading proficiency level
+  primary_language?: string;  // Student's primary language (default: 'English')
+  has_reading_difficulty?: boolean;  // Whether student has difficulty reading
+  needs_assistance?: boolean;  // Whether student may need assistance during assessment
+  previous_assessment?: boolean;  // Whether student has taken similar assessment before
 }
 
 export interface QuizGenerationResponse {
@@ -381,10 +390,31 @@ export interface QuizGenerationResponse {
   questions: QuizQuestion[];
   total_questions: number;
   condition: string;
+  assessment_type: string;
   dyslexia_questions?: number;  // Count of dyslexia questions
   autism_questions?: number;    // Count of autism questions
+  difficulty_distribution: {
+    easy: number;
+    moderate: number;
+    hard: number;
+  };
+  pre_assessment_data?: {
+    age?: number;
+    grade?: string;
+    reading_level?: string;
+    primary_language?: string;
+    has_reading_difficulty?: boolean;
+    needs_assistance?: boolean;
+    previous_assessment?: boolean;
+  };
+  recommendations?: {
+    use_visual_assessment: boolean;
+    difficulty_customized: boolean;
+    customization_reason: string;
+  };
   generated_at: string;
   generated_by?: number;
+  message: string;
 }
 
 export interface QuizInfo {

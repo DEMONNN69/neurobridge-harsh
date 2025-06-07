@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Users, Zap, ArrowRight, CheckCircle } from 'lucide-react';
+import { Brain, Users, Zap, ArrowRight, CheckCircle, ArrowLeft } from 'lucide-react';
 
 type AssessmentType = 'dyslexia' | 'autism' | 'both';
 

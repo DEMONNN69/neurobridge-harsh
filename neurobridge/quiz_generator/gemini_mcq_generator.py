@@ -155,7 +155,8 @@ def generate_assessment_questions(
 
     prompt = PromptTemplate(
         template=prompt_template_str,
-        input_variables=["condition", "num_easy", "num_moderate", "num_hard", "total_questions", "half_dyslexia", "half_autism"]
+        input_variables=["condition", "num_easy", 
+                        "num_moderate", "num_hard", "total_questions", "half_dyslexia", "half_autism"]
     )
 
     chain = LLMChain(llm=llm, prompt=prompt, output_parser=StrOutputParser())

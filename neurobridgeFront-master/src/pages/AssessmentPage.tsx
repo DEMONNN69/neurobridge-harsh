@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { apiService, QuizQuestion } from '../services/api';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useTextToSpeech } from '../hooks/useTextToSpeech';
+import { SpeakerButton } from '../components/SpeakerButton';
+import { ReadableOption } from '../components/ReadableOption';
 
 interface AssessmentAnswer {
   question_id: string;
@@ -26,6 +29,7 @@ interface AssessmentSubmission {
   correct_answers: number;
   total_assessment_time: number;  // Total time for entire assessment in seconds
   question_timings: QuestionTiming[];  // Detailed timing for each question
+  pre_assessment_data?: any;  // Pre-assessment data for customization tracking
 }
 
 interface AssessmentPhase {
@@ -37,16 +41,23 @@ interface AssessmentPhase {
 const AssessmentPage: React.FC = () => {
   const navigate = useNavigate();
   const { logout, updateAssessmentStatus } = useAuth();
+  
+  // State declarations
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<AssessmentAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [assessmentComplete, setAssessmentComplete] = useState(false);
+  const [assessmentResult, setAssessmentResult] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<any>(null);
   
   // Assessment phases for mixed assessments
   const [assessmentPhases, setAssessmentPhases] = useState<AssessmentPhase[]>([]);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
-  const [isPhaseTransition, setIsPhaseTransition] = useState(false);
   
   // Timing states
   const [assessmentStartTime, setAssessmentStartTime] = useState<number>(0);
@@ -54,12 +65,54 @@ const AssessmentPage: React.FC = () => {
   const [questionTimings, setQuestionTimings] = useState<QuestionTiming[]>([]);
   const [displayTime, setDisplayTime] = useState<string>('00:00');
   
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [assessmentComplete, setAssessmentComplete] = useState(false);
-  const [assessmentResult, setAssessmentResult] = useState<any>(null);
+  // TTS configuration
+  const { 
+    speakQuestion, 
+    stop: stopSpeech, 
+    isSupported: isTTSSupported,
+    setEnabled: setTTSEnabled 
+  } = useTextToSpeech();
+  
+  const [isTTSCurrentlyEnabled, setIsTTSCurrentlyEnabled] = useState<boolean>(true);
+  const hasAutoReadRef = useRef<boolean>(false);
   const isGeneratingRef = useRef(false);
+
+  // Toggle TTS on/off
+  const toggleTTS = () => {
+    const newState = !isTTSCurrentlyEnabled;
+    setIsTTSCurrentlyEnabled(newState);
+    setTTSEnabled(newState);
+    if (!newState) {
+      stopSpeech();
+    }
+  };
+
+  // Handle manual question reading
+  const handleReadQuestion = () => {
+    if (questions.length > 0 && currentQuestionIndex >= 0) {
+      const currentQuestion = questions[currentQuestionIndex];
+      speakQuestion(currentQuestion.question, currentQuestionIndex + 1);
+    }
+  };// Auto-read question when it changes
+  useEffect(() => {
+    if (questions.length > 0 && currentQuestionIndex >= 0 && isTTSSupported && isTTSCurrentlyEnabled && !hasAutoReadRef.current && !loading) {
+      const currentQuestion = questions[currentQuestionIndex];
+      if (currentQuestion) {
+        // Delay auto-read slightly to ensure UI is ready
+        const timer = setTimeout(() => {
+          speakQuestion(currentQuestion.question, currentQuestionIndex + 1);
+          hasAutoReadRef.current = true;
+        }, 500);
+
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [currentQuestionIndex, questions, speakQuestion, isTTSSupported, isTTSCurrentlyEnabled, loading]);
+  // Reset auto-read flag when question changes
+  useEffect(() => {
+    hasAutoReadRef.current = false;
+  }, [currentQuestionIndex]);
+  
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
@@ -123,18 +176,43 @@ const AssessmentPage: React.FC = () => {
       // Get assessment type from localStorage or default to 'both'
       const assessmentType = localStorage.getItem('assessmentType') || 'both';
       
+      // Get pre-assessment data from localStorage
+      const preAssessmentDataStr = localStorage.getItem('preAssessmentData');
+      let preAssessmentData = null;
+      
+      if (preAssessmentDataStr) {
+        try {
+          const parsedData = JSON.parse(preAssessmentDataStr);
+          // Convert the frontend field names to backend expected format
+          preAssessmentData = {
+            age: parsedData.age,
+            grade: parsedData.grade,
+            reading_level: parsedData.readingLevel,
+            primary_language: parsedData.primaryLanguage,
+            has_reading_difficulty: parsedData.hasReadingDifficulty,
+            needs_assistance: parsedData.needsAssistance,
+            previous_assessment: parsedData.previousAssessment
+          };
+          console.log('Using pre-assessment data for quiz customization:', preAssessmentData);
+        } catch (error) {
+          console.warn('Failed to parse pre-assessment data:', error);
+        }
+      }
+      
       if (assessmentType === 'both') {
         // For mixed assessments, send separate requests for dyslexia and autism
         console.log('Generating mixed assessment with separate API calls...');
         
         // Generate dyslexia questions first
         const dyslexiaResponse = await apiService.generateQuiz({
-          assessment_type: 'dyslexia'
+          assessment_type: 'dyslexia',
+          ...preAssessmentData
         });
         
         // Generate autism questions second
         const autismResponse = await apiService.generateQuiz({
-          assessment_type: 'autism'
+          assessment_type: 'autism',
+          ...preAssessmentData
         });
         
         // Create assessment phases
@@ -157,18 +235,35 @@ const AssessmentPage: React.FC = () => {
         setQuestions(phases[0].questions);
         setSessionId(phases[0].sessionId);
         setCurrentPhaseIndex(0);
-        
-        // Initialize answers array for the first phase
+          // Initialize answers array for the first phase
         setAnswers(new Array(phases[0].questions.length).fill(null).map((_, index) => ({
           question_id: phases[0].questions[index].question_id,
           selected_answer: '',
           is_correct: false,
           response_time: 0
         })));
+        
+        // Log customization info if available and store recommendations
+        let combinedRecommendations = null;
+        if (dyslexiaResponse.recommendations || autismResponse.recommendations) {
+          console.log('Assessment customization applied:');
+          combinedRecommendations = {
+            dyslexia: dyslexiaResponse.recommendations,
+            autism: autismResponse.recommendations
+          };
+          if (dyslexiaResponse.recommendations) {
+            console.log('Dyslexia assessment:', dyslexiaResponse.recommendations);
+          }
+          if (autismResponse.recommendations) {
+            console.log('Autism assessment:', autismResponse.recommendations);
+          }
+          setRecommendations(combinedRecommendations);
+        }
       } else {
         // For single condition assessments, use the original logic
         const response = await apiService.generateQuiz({
-          assessment_type: assessmentType
+          assessment_type: assessmentType,
+          ...preAssessmentData
         });
         
         setQuestions(response.questions);
@@ -181,6 +276,11 @@ const AssessmentPage: React.FC = () => {
           is_correct: false,
           response_time: 0
         })));
+          // Log customization info if available and store recommendations
+        if (response.recommendations) {
+          console.log('Assessment customization applied:', response.recommendations);
+          setRecommendations(response.recommendations);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate assessment questions');
@@ -258,8 +358,6 @@ const AssessmentPage: React.FC = () => {
     }
   };  const handlePhaseTransition = async (currentAnswers: AssessmentAnswer[], currentTimings: QuestionTiming[]) => {
     try {
-      setIsPhaseTransition(true);
-      
       // For mixed assessments, DO NOT submit the current phase individually
       // Instead, just store the dyslexia answers temporarily
       const currentPhase = assessmentPhases[currentPhaseIndex];
@@ -293,15 +391,12 @@ const AssessmentPage: React.FC = () => {
       const newPhaseStartTime = Date.now();
       setCurrentQuestionStartTime(newPhaseStartTime);
       
-      setIsPhaseTransition(false);
-      
       console.log(`Transitioned to ${nextPhase.type} phase`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transition between assessment phases');
-      setIsPhaseTransition(false);
     }
   };
-  const submitMixedAssessment = async (finalAnswers: AssessmentAnswer[], finalQuestionTimings: QuestionTiming[]) => {
+  const submitMixedAssessment = async (finalAnswers: AssessmentAnswer[], _finalQuestionTimings: QuestionTiming[]) => {
     try {
       setSubmitting(true);
         // Get stored dyslexia answers and timings from localStorage
@@ -321,20 +416,48 @@ const AssessmentPage: React.FC = () => {
       const autismPhase = assessmentPhases[currentPhaseIndex];
       const autismSessionId = autismPhase.sessionId;
       
+      // Get pre-assessment data from localStorage
+      const preAssessmentDataStr = localStorage.getItem('preAssessmentData');
+      let preAssessmentData = {};
+      
+      if (preAssessmentDataStr) {
+        try {
+          const parsedData = JSON.parse(preAssessmentDataStr);
+          // Convert frontend field names to backend expected format
+          preAssessmentData = {
+            age: parsedData.age,
+            grade: parsedData.grade,
+            reading_level: parsedData.readingLevel,
+            primary_language: parsedData.primaryLanguage,
+            has_reading_difficulty: parsedData.hasReadingDifficulty,
+            needs_assistance: parsedData.needsAssistance,
+            previous_assessment: parsedData.previousAssessment,
+            // Add customization metadata if available from recommendations
+            difficulty_customized: recommendations ? true : false,
+            customization_reason: recommendations ? recommendations.customization_reason : undefined,
+            visual_assessment_recommended: recommendations ? recommendations.use_visual_assessment : false
+          };
+        } catch (error) {
+          console.warn('Failed to parse pre-assessment data for combined submission:', error);
+        }
+      }
+      
       // Prepare combined assessment submission
       const combinedSubmission = {
         dyslexia_session_id: storedDyslexiaSessionId,
         autism_session_id: autismSessionId,
         dyslexia_answers: dyslexiaAnswers,
         autism_answers: finalAnswers,
-        total_assessment_time: Math.floor((Date.now() - assessmentStartTime) / 1000)
+        total_assessment_time: Math.floor((Date.now() - assessmentStartTime) / 1000),
+        pre_assessment_data: preAssessmentData
       };
       
       console.log('Submitting combined assessment:', {
         dyslexiaQuestions: dyslexiaAnswers.length,
         autismQuestions: finalAnswers.length,
         totalQuestions: dyslexiaAnswers.length + finalAnswers.length,
-        totalTime: combinedSubmission.total_assessment_time + ' seconds'
+        totalTime: combinedSubmission.total_assessment_time + ' seconds',
+        preAssessmentIncluded: Object.keys(preAssessmentData).length > 0
       });
       
       // Submit combined assessment using the new endpoint
@@ -375,6 +498,32 @@ const AssessmentPage: React.FC = () => {
       // Get assessment type from localStorage
       const assessmentType = localStorage.getItem('assessmentType') || 'both';
       
+      // Get pre-assessment data from localStorage
+      const preAssessmentDataStr = localStorage.getItem('preAssessmentData');
+      let preAssessmentData = {};
+      
+      if (preAssessmentDataStr) {
+        try {
+          const parsedData = JSON.parse(preAssessmentDataStr);
+          // Convert frontend field names to backend expected format
+          preAssessmentData = {
+            age: parsedData.age,
+            grade: parsedData.grade,
+            reading_level: parsedData.readingLevel,
+            primary_language: parsedData.primaryLanguage,
+            has_reading_difficulty: parsedData.hasReadingDifficulty,
+            needs_assistance: parsedData.needsAssistance,
+            previous_assessment: parsedData.previousAssessment,
+            // Add customization metadata if available from recommendations
+            difficulty_customized: recommendations ? true : false,
+            customization_reason: recommendations ? recommendations.customization_reason : undefined,
+            visual_assessment_recommended: recommendations ? recommendations.use_visual_assessment : false
+          };
+        } catch (error) {
+          console.warn('Failed to parse pre-assessment data for submission:', error);
+        }
+      }
+      
       const submission: AssessmentSubmission = {
         session_id: sessionId,
         assessment_type: assessmentType,
@@ -382,13 +531,15 @@ const AssessmentPage: React.FC = () => {
         total_questions: questions.length,
         correct_answers: correctCount,
         total_assessment_time: totalTime,
-        question_timings: finalQuestionTimings
+        question_timings: finalQuestionTimings,
+        pre_assessment_data: preAssessmentData
       };
 
-      console.log('Submitting assessment with timing data:', {
+      console.log('Submitting assessment with timing data and pre-assessment info:', {
         totalTime: totalTime + ' seconds',
         questionCount: finalQuestionTimings.length,
-        averageTimePerQuestion: (finalQuestionTimings.reduce((sum, q) => sum + q.response_time, 0) / finalQuestionTimings.length).toFixed(2) + ' seconds'
+        averageTimePerQuestion: (finalQuestionTimings.reduce((sum, q) => sum + q.response_time, 0) / finalQuestionTimings.length).toFixed(2) + ' seconds',
+        preAssessmentIncluded: Object.keys(preAssessmentData).length > 0
       });
 
       const result = await apiService.submitAssessment(submission);
@@ -540,33 +691,111 @@ const AssessmentPage: React.FC = () => {
                 style={{ width: `${progress}%` }}
               ></div>
             </div>
+          </div>        </div>
+      </div>
+
+      {/* Visual Assessment Recommendation Banner */}
+      {recommendations && recommendations.use_visual_assessment && (
+        <div className="bg-amber-50 border-l-4 border-amber-400 p-4">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-amber-700">
+                  <strong>Recommendation:</strong> Based on the assessment profile, a visual/interactive assessment may be more suitable for this student.
+                  {recommendations.customization_reason && (
+                    <span className="block mt-1 text-amber-600">
+                      Reason: {recommendations.customization_reason}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Mixed assessment recommendation banner */}
+      {recommendations && typeof recommendations === 'object' && (recommendations.dyslexia?.use_visual_assessment || recommendations.autism?.use_visual_assessment) && (
+        <div className="bg-amber-50 border-l-4 border-amber-400 p-4">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-amber-700">
+                  <strong>Assessment Customization Applied:</strong> Questions have been adjusted based on student profile.
+                  {recommendations.dyslexia?.customization_reason && (
+                    <span className="block mt-1 text-amber-600">
+                      Dyslexia assessment: {recommendations.dyslexia.customization_reason}
+                    </span>
+                  )}
+                  {recommendations.autism?.customization_reason && (
+                    <span className="block mt-1 text-amber-600">
+                      Autism assessment: {recommendations.autism.customization_reason}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-md p-8">
-          {/* Question */}          <div className="mb-8">
-            <div className="flex items-center mb-4">
+          {/* Question */}          <div className="mb-8">            <div className="flex items-center justify-between mb-4">
               <span className="bg-indigo-100 text-indigo-800 text-sm font-medium px-3 py-1 rounded-full">
                 {currentQuestion.difficulty}
               </span>
+              {/* TTS Toggle and Speaker Controls */}
+              <div className="flex items-center space-x-2">
+                {isTTSSupported && (
+                  <>
+                    <button
+                      onClick={toggleTTS}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        isTTSCurrentlyEnabled 
+                          ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                      title={`Turn ${isTTSCurrentlyEnabled ? 'off' : 'on'} text-to-speech`}
+                    >
+                      TTS {isTTSCurrentlyEnabled ? 'ON' : 'OFF'}
+                    </button>
+                    <SpeakerButton
+                      onClick={handleReadQuestion}
+                      disabled={!isTTSCurrentlyEnabled}
+                      size="sm"
+                      variant="secondary"
+                    />
+                  </>
+                )}
+              </div>
             </div>
             
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
               {currentQuestion.question}
             </h2>
-          </div>
-
-          {/* Answer Options */}
+          </div>          {/* Answer Options */}
           <div className="space-y-3 mb-8">
             {currentQuestion.options.map((option, index) => {
               const optionLabel = String.fromCharCode(65 + index); // A, B, C, D
               const isSelected = selectedAnswer === optionLabel;
               
               return (
-                <button
+                <ReadableOption
                   key={index}
+                  optionLabel={optionLabel}
+                  optionText={option}
+                  isSelected={isSelected}
                   onClick={() => handleAnswerSelect(optionLabel)}
                   className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                     isSelected
@@ -584,7 +813,7 @@ const AssessmentPage: React.FC = () => {
                     </span>
                     <span className="text-gray-900">{option}</span>
                   </div>
-                </button>
+                </ReadableOption>
               );
             })}
           </div>

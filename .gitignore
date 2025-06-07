@@ -52,8 +52,7 @@ coverage.xml
 # Django
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
+
 
 # Flask
 instance/
@@ -288,9 +287,7 @@ media/
 static/
 
 # Database
-*.db
-*.sqlite
-*.sqlite3
+
 
 # Backup files
 *.bak
