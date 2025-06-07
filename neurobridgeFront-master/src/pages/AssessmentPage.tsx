@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiService, QuizQuestion } from '../services/api';
 import { ChevronLeft, ChevronRight, CheckCircle, Clock, LogOut } from 'lucide-react';
@@ -28,6 +28,12 @@ interface AssessmentSubmission {
   question_timings: QuestionTiming[];  // Detailed timing for each question
 }
 
+interface AssessmentPhase {
+  type: 'dyslexia' | 'autism';
+  questions: QuizQuestion[];
+  sessionId: string;
+}
+
 const AssessmentPage: React.FC = () => {
   const navigate = useNavigate();
   const { logout, updateAssessmentStatus } = useAuth();
@@ -36,7 +42,13 @@ const AssessmentPage: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<AssessmentAnswer[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
-    // Timing states
+  
+  // Assessment phases for mixed assessments
+  const [assessmentPhases, setAssessmentPhases] = useState<AssessmentPhase[]>([]);
+  const [currentPhaseIndex, setCurrentPhaseIndex] = useState(0);
+  const [isPhaseTransition, setIsPhaseTransition] = useState(false);
+  
+  // Timing states
   const [assessmentStartTime, setAssessmentStartTime] = useState<number>(0);
   const [currentQuestionStartTime, setCurrentQuestionStartTime] = useState<number>(0);
   const [questionTimings, setQuestionTimings] = useState<QuestionTiming[]>([]);
@@ -47,6 +59,7 @@ const AssessmentPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [assessmentComplete, setAssessmentComplete] = useState(false);
   const [assessmentResult, setAssessmentResult] = useState<any>(null);
+  const isGeneratingRef = useRef(false);
   const handleLogout = () => {
     logout();
     navigate('/login', { replace: true });
@@ -72,7 +85,7 @@ const AssessmentPage: React.FC = () => {
 
   useEffect(() => {
     // Only generate questions once on mount and if assessment is not already complete
-    if (!assessmentComplete && questions.length === 0) {
+    if (!assessmentComplete && questions.length === 0 && !isGeneratingRef.current) {
       generateQuestions();
     }
     // eslint-disable-next-line
@@ -96,10 +109,12 @@ const AssessmentPage: React.FC = () => {
       console.log(`Question ${currentQuestionIndex + 1} timer started at:`, new Date(questionStart).toISOString());
     }
   }, [currentQuestionIndex, assessmentStartTime]);  const generateQuestions = async () => {
-    // Prevent regeneration if assessment is already complete
-    if (assessmentComplete || questions.length > 0) {
+    // Prevent regeneration if assessment is already complete or already generating
+    if (assessmentComplete || questions.length > 0 || isGeneratingRef.current) {
       return;
     }
+    
+    isGeneratingRef.current = true; // Set flag to prevent duplicate calls
     
     try {
       setLoading(true);
@@ -108,25 +123,70 @@ const AssessmentPage: React.FC = () => {
       // Get assessment type from localStorage or default to 'both'
       const assessmentType = localStorage.getItem('assessmentType') || 'both';
       
-      // Send minimal request - let backend handle all the logic
-      const response = await apiService.generateQuiz({
-        assessment_type: assessmentType
-      });
-      
-      setQuestions(response.questions);
-      setSessionId(response.session_id);
-      
-      // Initialize answers array
-      setAnswers(new Array(response.questions.length).fill(null).map((_, index) => ({
-        question_id: response.questions[index].question_id,
-        selected_answer: '',
-        is_correct: false,
-        response_time: 0
-      })));
+      if (assessmentType === 'both') {
+        // For mixed assessments, send separate requests for dyslexia and autism
+        console.log('Generating mixed assessment with separate API calls...');
+        
+        // Generate dyslexia questions first
+        const dyslexiaResponse = await apiService.generateQuiz({
+          assessment_type: 'dyslexia'
+        });
+        
+        // Generate autism questions second
+        const autismResponse = await apiService.generateQuiz({
+          assessment_type: 'autism'
+        });
+        
+        // Create assessment phases
+        const phases: AssessmentPhase[] = [
+          {
+            type: 'dyslexia',
+            questions: dyslexiaResponse.questions,
+            sessionId: dyslexiaResponse.session_id
+          },
+          {
+            type: 'autism',
+            questions: autismResponse.questions,
+            sessionId: autismResponse.session_id
+          }
+        ];
+        
+        setAssessmentPhases(phases);
+        
+        // Start with the first phase (dyslexia)
+        setQuestions(phases[0].questions);
+        setSessionId(phases[0].sessionId);
+        setCurrentPhaseIndex(0);
+        
+        // Initialize answers array for the first phase
+        setAnswers(new Array(phases[0].questions.length).fill(null).map((_, index) => ({
+          question_id: phases[0].questions[index].question_id,
+          selected_answer: '',
+          is_correct: false,
+          response_time: 0
+        })));
+      } else {
+        // For single condition assessments, use the original logic
+        const response = await apiService.generateQuiz({
+          assessment_type: assessmentType
+        });
+        
+        setQuestions(response.questions);
+        setSessionId(response.session_id);
+        
+        // Initialize answers array
+        setAnswers(new Array(response.questions.length).fill(null).map((_, index) => ({
+          question_id: response.questions[index].question_id,
+          selected_answer: '',
+          is_correct: false,
+          response_time: 0
+        })));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate assessment questions');
     } finally {
       setLoading(false);
+      isGeneratingRef.current = false; // Reset flag when done
     }
   };
 
@@ -179,11 +239,117 @@ const AssessmentPage: React.FC = () => {
     setAnswers(updatedAnswers);
     setSelectedAnswer('');
 
-    // Move to next question or complete assessment
+    // Check if we're at the end of the current phase
     if (currentQuestionIndex < questions.length - 1) {
+      // Continue to next question in current phase
       setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else if (assessmentPhases.length > 0 && currentPhaseIndex < assessmentPhases.length - 1) {
+      // We're in a mixed assessment and need to transition to the next phase
+      handlePhaseTransition(updatedAnswers, [...questionTimings, newQuestionTiming]);
     } else {
-      submitAssessment(updatedAnswers, [...questionTimings, newQuestionTiming]);
+      // Assessment is complete
+      if (assessmentPhases.length > 0) {
+        // For mixed assessments, combine all phases before submitting
+        submitMixedAssessment(updatedAnswers, [...questionTimings, newQuestionTiming]);
+      } else {
+        // For single condition assessments
+        submitAssessment(updatedAnswers, [...questionTimings, newQuestionTiming]);
+      }
+    }
+  };  const handlePhaseTransition = async (currentAnswers: AssessmentAnswer[], currentTimings: QuestionTiming[]) => {
+    try {
+      setIsPhaseTransition(true);
+      
+      // For mixed assessments, DO NOT submit the current phase individually
+      // Instead, just store the dyslexia answers temporarily
+      const currentPhase = assessmentPhases[currentPhaseIndex];
+      
+      // Store dyslexia answers and timings in localStorage for later combined submission
+      if (currentPhase.type === 'dyslexia') {
+        localStorage.setItem('dyslexiaAnswers', JSON.stringify(currentAnswers));
+        localStorage.setItem('dyslexiaTimings', JSON.stringify(currentTimings));
+        localStorage.setItem('dyslexiaSessionId', currentPhase.sessionId);
+        console.log('Stored dyslexia answers temporarily for combined submission');
+      }
+      
+      // Move to next phase
+      const nextPhaseIndex = currentPhaseIndex + 1;
+      const nextPhase = assessmentPhases[nextPhaseIndex];
+      
+      setCurrentPhaseIndex(nextPhaseIndex);
+      setQuestions(nextPhase.questions);
+      setSessionId(nextPhase.sessionId);
+      setCurrentQuestionIndex(0);
+      
+      // Initialize answers for the new phase
+      setAnswers(new Array(nextPhase.questions.length).fill(null).map((_, index) => ({
+        question_id: nextPhase.questions[index].question_id,
+        selected_answer: '',
+        is_correct: false,
+        response_time: 0
+      })));
+      
+      // Reset timing for new phase
+      const newPhaseStartTime = Date.now();
+      setCurrentQuestionStartTime(newPhaseStartTime);
+      
+      setIsPhaseTransition(false);
+      
+      console.log(`Transitioned to ${nextPhase.type} phase`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transition between assessment phases');
+      setIsPhaseTransition(false);
+    }
+  };
+  const submitMixedAssessment = async (finalAnswers: AssessmentAnswer[], finalQuestionTimings: QuestionTiming[]) => {
+    try {
+      setSubmitting(true);
+        // Get stored dyslexia answers and timings from localStorage
+      const storedDyslexiaAnswers = localStorage.getItem('dyslexiaAnswers');
+      // Note: dyslexiaTimings could be used for future detailed timing analysis
+      // const storedDyslexiaTimings = localStorage.getItem('dyslexiaTimings');
+      const storedDyslexiaSessionId = localStorage.getItem('dyslexiaSessionId');
+      
+      if (!storedDyslexiaAnswers || !storedDyslexiaSessionId) {
+        throw new Error('Dyslexia assessment data not found. Please restart the assessment.');
+      }
+        const dyslexiaAnswers: AssessmentAnswer[] = JSON.parse(storedDyslexiaAnswers);
+      // Note: dyslexiaTimings could be used for future detailed timing analysis
+      // const dyslexiaTimings: QuestionTiming[] = JSON.parse(storedDyslexiaTimings || '[]');
+      
+      // Get current autism phase data
+      const autismPhase = assessmentPhases[currentPhaseIndex];
+      const autismSessionId = autismPhase.sessionId;
+      
+      // Prepare combined assessment submission
+      const combinedSubmission = {
+        dyslexia_session_id: storedDyslexiaSessionId,
+        autism_session_id: autismSessionId,
+        dyslexia_answers: dyslexiaAnswers,
+        autism_answers: finalAnswers,
+        total_assessment_time: Math.floor((Date.now() - assessmentStartTime) / 1000)
+      };
+      
+      console.log('Submitting combined assessment:', {
+        dyslexiaQuestions: dyslexiaAnswers.length,
+        autismQuestions: finalAnswers.length,
+        totalQuestions: dyslexiaAnswers.length + finalAnswers.length,
+        totalTime: combinedSubmission.total_assessment_time + ' seconds'
+      });
+      
+      // Submit combined assessment using the new endpoint
+      const result = await apiService.submitCombinedAssessment(combinedSubmission);
+      
+      // Clean up stored data
+      localStorage.removeItem('dyslexiaAnswers');
+      localStorage.removeItem('dyslexiaTimings');
+      localStorage.removeItem('dyslexiaSessionId');
+      
+      setAssessmentResult(result);
+      setAssessmentComplete(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to submit combined assessment');
+      setSubmitting(false);
     }
   };
 

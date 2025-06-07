@@ -43,7 +43,7 @@ const Register: React.FC = () => {
     
     try {
       await register(fullName, username, email, password, confirmPassword, role);
-      navigate('/dashboard');
+      navigate('/student/assessment-type');
     } catch (err) {
       // Error is handled in AuthContext
     }
