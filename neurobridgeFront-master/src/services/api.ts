@@ -58,8 +58,24 @@ export interface StudentProfile {
   learning_goals?: string;
   accommodation_notes?: string;
   parent_contact?: string;
-  enrollment_date: string;
-  user: number;
+  enrollment_date: string;  user: number;
+}
+
+export interface PreAssessmentData {
+  age: number;
+  grade: string;
+  reading_level: string;
+  primary_language: string;
+  has_reading_difficulty: boolean;
+  needs_assistance: boolean;
+  previous_assessment: boolean;
+}
+
+export interface PreAssessmentResponse {
+  pre_assessment_completed: boolean;
+  data: PreAssessmentData & {
+    completed_date?: string;
+  };
 }
 
 export interface TeacherProfile {
@@ -1015,10 +1031,25 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
-
   // Check if student has completed assessment
   async checkAssessmentCompletion(): Promise<{ completed: boolean; assessment_score?: number }> {
     return this.authenticatedRequest('/profiles/student/assessment-status/');
+  }
+
+  // Pre-assessment API methods
+  async savePreAssessmentData(data: PreAssessmentData): Promise<{ message: string }> {
+    return this.authenticatedRequest('/profiles/pre-assessment/save/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+  async getPreAssessmentData(): Promise<PreAssessmentResponse | null> {
+    try {
+      return await this.authenticatedRequest('/profiles/pre-assessment/get/');
+    } catch (error) {
+      // Return null if no pre-assessment data found
+      return null;
+    }
   }
 }
 

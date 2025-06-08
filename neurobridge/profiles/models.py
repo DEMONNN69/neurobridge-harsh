@@ -44,11 +44,21 @@ class StudentProfile(models.Model):
     dyslexia_prediction_level = models.CharField(max_length=20, null=True, blank=True, help_text="Predicted dyslexia level (Low, Moderate, High)")
     dyslexia_prediction_confidence = models.FloatField(null=True, blank=True, help_text="Prediction confidence score (0-1)")
     dyslexia_prediction_date = models.DateTimeField(null=True, blank=True, help_text="When the prediction was made")
-    
-    # XGBoost autism prediction results
+      # XGBoost autism prediction results
     autism_prediction_level = models.CharField(max_length=20, null=True, blank=True, help_text="Predicted autism level (Low, Moderate, High)")
     autism_prediction_confidence = models.FloatField(null=True, blank=True, help_text="Prediction confidence score (0-1)")
     autism_prediction_date = models.DateTimeField(null=True, blank=True, help_text="When the prediction was made")
+    
+    # Pre-assessment form data
+    age = models.PositiveIntegerField(null=True, blank=True, help_text="Student's age")
+    grade_level_detailed = models.CharField(max_length=20, null=True, blank=True, help_text="Student's grade level (Elementary, Middle School, etc.)")
+    reading_level = models.CharField(max_length=50, null=True, blank=True, help_text="Student's reading level")
+    primary_language = models.CharField(max_length=50, default='English', help_text="Student's primary language")
+    has_reading_difficulty = models.BooleanField(default=False, help_text="Does the student have reading difficulties?")
+    needs_assistance = models.BooleanField(default=False, help_text="Does the student need special assistance?")
+    previous_assessment = models.BooleanField(default=False, help_text="Has the student taken assessments before?")
+    pre_assessment_completed = models.BooleanField(default=False, help_text="Has the student completed the pre-assessment form?")
+    pre_assessment_date = models.DateTimeField(null=True, blank=True, help_text="When the pre-assessment was completed")
     
     learning_goals = models.TextField(blank=True, null=True)
     accommodation_notes = models.TextField(blank=True, null=True)

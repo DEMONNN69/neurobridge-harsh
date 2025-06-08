@@ -42,6 +42,44 @@ const AssessmentPage: React.FC = () => {
   const navigate = useNavigate();
   const { logout, updateAssessmentStatus } = useAuth();
   
+  // Helper function to get pre-assessment data from profile or fallback to localStorage
+  const getPreAssessmentData = async () => {
+    try {
+      const profileResponse = await apiService.getPreAssessmentData();
+      if (profileResponse && profileResponse.data) {
+        console.log('Using pre-assessment data from profile:', profileResponse.data);
+        return profileResponse.data;
+      }
+    } catch (error) {
+      console.warn('Failed to fetch pre-assessment data from profile:', error);
+    }
+    
+    // Fallback to localStorage
+    const preAssessmentDataStr = localStorage.getItem('preAssessmentData');
+    if (preAssessmentDataStr) {
+      try {
+        const parsedData = JSON.parse(preAssessmentDataStr);
+        // Convert the frontend field names to backend expected format
+        const convertedData = {
+          age: parsedData.age,
+          grade: parsedData.grade,
+          reading_level: parsedData.reading_level || parsedData.readingLevel,
+          primary_language: parsedData.primary_language || parsedData.primaryLanguage,
+          has_reading_difficulty: parsedData.has_reading_difficulty || parsedData.hasReadingDifficulty,
+          needs_assistance: parsedData.needs_assistance || parsedData.needsAssistance,
+          previous_assessment: parsedData.previous_assessment || parsedData.previousAssessment
+        };
+        console.log('Using fallback pre-assessment data from localStorage:', convertedData);
+        return convertedData;
+      } catch (parseError) {
+        console.warn('Failed to parse localStorage pre-assessment data:', parseError);
+      }
+    }
+    
+    console.log('No pre-assessment data found');
+    return null;
+  };
+
   // State declarations
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
@@ -168,36 +206,17 @@ const AssessmentPage: React.FC = () => {
     }
     
     isGeneratingRef.current = true; // Set flag to prevent duplicate calls
-    
-    try {
+      try {
       setLoading(true);
       setError(null);
       
       // Get assessment type from localStorage or default to 'both'
       const assessmentType = localStorage.getItem('assessmentType') || 'both';
       
-      // Get pre-assessment data from localStorage
-      const preAssessmentDataStr = localStorage.getItem('preAssessmentData');
+      // Get pre-assessment data from user's profile
       let preAssessmentData = null;
       
-      if (preAssessmentDataStr) {
-        try {
-          const parsedData = JSON.parse(preAssessmentDataStr);
-          // Convert the frontend field names to backend expected format
-          preAssessmentData = {
-            age: parsedData.age,
-            grade: parsedData.grade,
-            reading_level: parsedData.readingLevel,
-            primary_language: parsedData.primaryLanguage,
-            has_reading_difficulty: parsedData.hasReadingDifficulty,
-            needs_assistance: parsedData.needsAssistance,
-            previous_assessment: parsedData.previousAssessment
-          };
-          console.log('Using pre-assessment data for quiz customization:', preAssessmentData);
-        } catch (error) {
-          console.warn('Failed to parse pre-assessment data:', error);
-        }
-      }
+      preAssessmentData = await getPreAssessmentData();
       
       if (assessmentType === 'both') {
         // For mixed assessments, send separate requests for dyslexia and autism
@@ -395,8 +414,7 @@ const AssessmentPage: React.FC = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transition between assessment phases');
     }
-  };
-  const submitMixedAssessment = async (finalAnswers: AssessmentAnswer[], _finalQuestionTimings: QuestionTiming[]) => {
+  };  const submitMixedAssessment = async (finalAnswers: AssessmentAnswer[], _finalQuestionTimings: QuestionTiming[]) => {
     try {
       setSubmitting(true);
         // Get stored dyslexia answers and timings from localStorage
@@ -416,31 +434,8 @@ const AssessmentPage: React.FC = () => {
       const autismPhase = assessmentPhases[currentPhaseIndex];
       const autismSessionId = autismPhase.sessionId;
       
-      // Get pre-assessment data from localStorage
-      const preAssessmentDataStr = localStorage.getItem('preAssessmentData');
-      let preAssessmentData = {};
-      
-      if (preAssessmentDataStr) {
-        try {
-          const parsedData = JSON.parse(preAssessmentDataStr);
-          // Convert frontend field names to backend expected format
-          preAssessmentData = {
-            age: parsedData.age,
-            grade: parsedData.grade,
-            reading_level: parsedData.readingLevel,
-            primary_language: parsedData.primaryLanguage,
-            has_reading_difficulty: parsedData.hasReadingDifficulty,
-            needs_assistance: parsedData.needsAssistance,
-            previous_assessment: parsedData.previousAssessment,
-            // Add customization metadata if available from recommendations
-            difficulty_customized: recommendations ? true : false,
-            customization_reason: recommendations ? recommendations.customization_reason : undefined,
-            visual_assessment_recommended: recommendations ? recommendations.use_visual_assessment : false
-          };
-        } catch (error) {
-          console.warn('Failed to parse pre-assessment data for combined submission:', error);
-        }
-      }
+      // Get pre-assessment data from user profile API with localStorage fallback
+      let preAssessmentData = await getPreAssessmentData();
       
       // Prepare combined assessment submission
       const combinedSubmission = {
@@ -451,13 +446,12 @@ const AssessmentPage: React.FC = () => {
         total_assessment_time: Math.floor((Date.now() - assessmentStartTime) / 1000),
         pre_assessment_data: preAssessmentData
       };
-      
-      console.log('Submitting combined assessment:', {
+        console.log('Submitting combined assessment:', {
         dyslexiaQuestions: dyslexiaAnswers.length,
         autismQuestions: finalAnswers.length,
         totalQuestions: dyslexiaAnswers.length + finalAnswers.length,
         totalTime: combinedSubmission.total_assessment_time + ' seconds',
-        preAssessmentIncluded: Object.keys(preAssessmentData).length > 0
+        preAssessmentIncluded: preAssessmentData ? Object.keys(preAssessmentData).length > 0 : false
       });
       
       // Submit combined assessment using the new endpoint
@@ -484,8 +478,7 @@ const AssessmentPage: React.FC = () => {
       if (previousAnswer) {
         setSelectedAnswer(previousAnswer.selected_answer);
       }
-    }
-  };  const submitAssessment = async (finalAnswers: AssessmentAnswer[], finalQuestionTimings: QuestionTiming[]) => {
+    }  };  const submitAssessment = async (finalAnswers: AssessmentAnswer[], finalQuestionTimings: QuestionTiming[]) => {
     try {
       setSubmitting(true);
       
@@ -498,31 +491,8 @@ const AssessmentPage: React.FC = () => {
       // Get assessment type from localStorage
       const assessmentType = localStorage.getItem('assessmentType') || 'both';
       
-      // Get pre-assessment data from localStorage
-      const preAssessmentDataStr = localStorage.getItem('preAssessmentData');
-      let preAssessmentData = {};
-      
-      if (preAssessmentDataStr) {
-        try {
-          const parsedData = JSON.parse(preAssessmentDataStr);
-          // Convert frontend field names to backend expected format
-          preAssessmentData = {
-            age: parsedData.age,
-            grade: parsedData.grade,
-            reading_level: parsedData.readingLevel,
-            primary_language: parsedData.primaryLanguage,
-            has_reading_difficulty: parsedData.hasReadingDifficulty,
-            needs_assistance: parsedData.needsAssistance,
-            previous_assessment: parsedData.previousAssessment,
-            // Add customization metadata if available from recommendations
-            difficulty_customized: recommendations ? true : false,
-            customization_reason: recommendations ? recommendations.customization_reason : undefined,
-            visual_assessment_recommended: recommendations ? recommendations.use_visual_assessment : false
-          };
-        } catch (error) {
-          console.warn('Failed to parse pre-assessment data for submission:', error);
-        }
-      }
+      // Get pre-assessment data from user profile API with localStorage fallback
+      let preAssessmentData = await getPreAssessmentData();
       
       const submission: AssessmentSubmission = {
         session_id: sessionId,
@@ -533,13 +503,11 @@ const AssessmentPage: React.FC = () => {
         total_assessment_time: totalTime,
         question_timings: finalQuestionTimings,
         pre_assessment_data: preAssessmentData
-      };
-
-      console.log('Submitting assessment with timing data and pre-assessment info:', {
+      };      console.log('Submitting assessment with timing data and pre-assessment info:', {
         totalTime: totalTime + ' seconds',
         questionCount: finalQuestionTimings.length,
         averageTimePerQuestion: (finalQuestionTimings.reduce((sum, q) => sum + q.response_time, 0) / finalQuestionTimings.length).toFixed(2) + ' seconds',
-        preAssessmentIncluded: Object.keys(preAssessmentData).length > 0
+        preAssessmentIncluded: preAssessmentData ? Object.keys(preAssessmentData).length > 0 : false
       });
 
       const result = await apiService.submitAssessment(submission);

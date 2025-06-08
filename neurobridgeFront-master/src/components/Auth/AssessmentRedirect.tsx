@@ -13,11 +13,8 @@ const AssessmentRedirect: React.FC = () => {
   if (user.assessmentCompleted) {
     return <Navigate to="/student/dashboard" replace />;
   }
-  
-  // Check if pre-assessment data exists
-  const preAssessmentData = localStorage.getItem('preAssessmentData');
-  
-  if (!preAssessmentData) {
+    // Check if pre-assessment is completed from user profile
+  if (!user.preAssessmentCompleted) {
     // Redirect to pre-assessment form first
     return <Navigate to="/student/pre-assessment" replace />;
   }

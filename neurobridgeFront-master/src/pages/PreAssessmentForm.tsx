@@ -1,33 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Calendar, GraduationCap, Languages, Users, ChevronRight, ChevronLeft, Check, ArrowRight } from 'lucide-react';
+import { apiService } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 interface PreAssessmentData {
   age: number;
   birthdate: string;
   grade: string;
-  readingLevel: string;
-  primaryLanguage: string;
-  hasReadingDifficulty: boolean;
-  needsAssistance: boolean;
-  previousAssessment: boolean;
+  reading_level: string;
+  primary_language: string;
+  has_reading_difficulty: boolean;
+  needs_assistance: boolean;
+  previous_assessment: boolean;
 }
 
 const PreAssessmentForm: React.FC = () => {
   const navigate = useNavigate();
+  const { updatePreAssessmentStatus } = useAuth();
   
   // Form state
   const [formData, setFormData] = useState<PreAssessmentData>({
     age: 0,
     birthdate: '',
     grade: '',
-    readingLevel: '',
-    primaryLanguage: 'English',
-    hasReadingDifficulty: false,
-    needsAssistance: false,
-    previousAssessment: false
+    reading_level: '',
+    primary_language: 'English',
+    has_reading_difficulty: false,
+    needs_assistance: false,
+    previous_assessment: false
   });
   const [errors, setErrors] = useState<Partial<PreAssessmentData>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(true);
   
   // Form navigation state
   const [currentSection, setCurrentSection] = useState(0);
@@ -36,6 +41,44 @@ const PreAssessmentForm: React.FC = () => {
     { id: 'academic', title: 'Your Learning', description: 'Your grade and reading skills', icon: GraduationCap },
     { id: 'support', title: 'Support Needs', description: 'How we can help you', icon: Users }
   ];
+
+  // Load existing pre-assessment data on component mount
+  useEffect(() => {
+    const loadExistingData = async () => {
+      try {
+        setLoadingExisting(true);        const existingResponse = await apiService.getPreAssessmentData();
+        
+        if (existingResponse && existingResponse.data) {
+          const existingData = existingResponse.data;
+          // Calculate birthdate from age if available
+          let birthdate = '';
+          if (existingData.age && existingData.age > 0) {
+            const currentYear = new Date().getFullYear();
+            const birthYear = currentYear - existingData.age;
+            birthdate = `${birthYear}-01-01`; // Use January 1st as default
+          }
+          
+          setFormData({
+            age: existingData.age || 0,
+            birthdate: birthdate,
+            grade: existingData.grade || '',
+            reading_level: existingData.reading_level || '',
+            primary_language: existingData.primary_language || 'English',
+            has_reading_difficulty: existingData.has_reading_difficulty || false,
+            needs_assistance: existingData.needs_assistance || false,
+            previous_assessment: existingData.previous_assessment || false
+          });
+        }
+      } catch (error) {
+        console.error('Error loading existing pre-assessment data:', error);
+        // Continue with empty form if loading fails
+      } finally {
+        setLoadingExisting(false);
+      }
+    };
+
+    loadExistingData();
+  }, []);
 
   // Calculate age from birthdate
   const calculateAge = (birthdate: string): number => {
@@ -60,7 +103,7 @@ const PreAssessmentForm: React.FC = () => {
   };
 
   // Reading levels with visual indicators
-  const readingLevels = [
+  const reading_levels = [
     { value: 'Cannot read yet', emoji: '🌱', description: 'Just starting to learn' },
     { value: 'Beginning reader (simple words)', emoji: '🌿', description: 'Can read simple words' },
     { value: 'Early reader (simple sentences)', emoji: '🌳', description: 'Can read basic sentences' },
@@ -85,7 +128,6 @@ const PreAssessmentForm: React.FC = () => {
       setErrors(prev => ({ ...prev, [field]: undefined }));
     }
   };
-
   const validateCurrentSection = (): boolean => {
     const newErrors: Partial<PreAssessmentData> = {};
 
@@ -99,16 +141,16 @@ const PreAssessmentForm: React.FC = () => {
           newErrors.birthdate = 'Age must be between 3 and 100 years' as any;
         }
       }
-      if (!formData.primaryLanguage) {
-        newErrors.primaryLanguage = 'Please select your primary language' as any;
+      if (!formData.primary_language) {
+        newErrors.primary_language = 'Please select your primary language' as any;
       }
     } else if (currentSection === 1) {
       // Academic Information validation
       if (!formData.grade) {
         newErrors.grade = 'Please select a grade level' as any;
       }
-      if (!formData.readingLevel) {
-        newErrors.readingLevel = 'Please select a reading level' as any;
+      if (!formData.reading_level) {
+        newErrors.reading_level = 'Please select a reading level' as any;
       }
     }
 
@@ -127,24 +169,49 @@ const PreAssessmentForm: React.FC = () => {
       setCurrentSection(currentSection - 1);
     }
   };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateCurrentSection()) {
       return;
     }
 
-    // Store form data in localStorage for the assessment
-    localStorage.setItem('preAssessmentData', JSON.stringify(formData));
-    
-    // Navigate to assessment type selection
-    navigate('/student/assessment-type-selection');
+    try {
+      setIsLoading(true);
+      
+      // Calculate final age from birthdate if available
+      const finalAge = formData.birthdate ? calculateAge(formData.birthdate) : formData.age;
+      
+      // Prepare data for API (exclude birthdate as it's not part of the API)
+      const apiData = {
+        age: finalAge,
+        grade: formData.grade,
+        reading_level: formData.reading_level,
+        primary_language: formData.primary_language,
+        has_reading_difficulty: formData.has_reading_difficulty,
+        needs_assistance: formData.needs_assistance,
+        previous_assessment: formData.previous_assessment
+      };
+        // Save data to user's profile
+      await apiService.savePreAssessmentData(apiData);
+      
+      // Update the user's pre-assessment completion status
+      updatePreAssessmentStatus(true);
+      
+      // Navigate to assessment type selection
+      navigate('/student/assessment-type-selection');
+    } catch (error) {
+      console.error('Error saving pre-assessment data:', error);
+      // For now, continue with localStorage as fallback
+      localStorage.setItem('preAssessmentData', JSON.stringify(formData));
+      navigate('/student/assessment-type-selection');
+    } finally {
+      setIsLoading(false);
+    }
   };
-
   const getRecommendedAssessmentType = () => {
     const currentAge = formData.birthdate ? calculateAge(formData.birthdate) : formData.age;
-    if (currentAge < 7 || formData.readingLevel === 'Cannot read yet' || formData.readingLevel === 'Beginning reader (simple words)') {
+    if (currentAge < 7 || formData.reading_level === 'Cannot read yet' || formData.reading_level === 'Beginning reader (simple words)') {
       return 'Visual/Interactive Assessment (Recommended for young children or non-readers)';
     }
     return 'Standard Text Assessment';
@@ -201,9 +268,9 @@ const PreAssessmentForm: React.FC = () => {
                 <button
                   key={language}
                   type="button"
-                  onClick={() => handleInputChange('primaryLanguage', language)}
+                  onClick={() => handleInputChange('primary_language', language)}
                   className={`p-4 text-lg font-semibold rounded-xl border-3 transition-all duration-200 hover:scale-105 ${
-                    formData.primaryLanguage === language
+                    formData.primary_language === language
                       ? 'border-blue-500 bg-blue-100 text-blue-800 shadow-lg'
                       : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
                   }`}
@@ -221,9 +288,9 @@ const PreAssessmentForm: React.FC = () => {
                 <button
                   key={language}
                   type="button"
-                  onClick={() => handleInputChange('primaryLanguage', language)}
+                  onClick={() => handleInputChange('primary_language', language)}
                   className={`p-3 text-sm font-medium rounded-lg border-2 transition-all duration-200 hover:scale-105 ${
-                    formData.primaryLanguage === language
+                    formData.primary_language === language
                       ? 'border-blue-500 bg-blue-100 text-blue-700'
                       : 'border-gray-300 bg-white text-gray-600 hover:border-blue-300 hover:bg-blue-50'
                   }`}
@@ -234,12 +301,12 @@ const PreAssessmentForm: React.FC = () => {
             </div>
           </div>
           
-          {formData.primaryLanguage === 'Other' && (
+          {formData.primary_language === 'Other' && (
             <div className="max-w-md mx-auto mt-4">
               <input
                 type="text"
                 placeholder="Please tell us your language"
-                onChange={(e) => handleInputChange('primaryLanguage', e.target.value || 'Other')}
+                onChange={(e) => handleInputChange('primary_language', e.target.value || 'Other')}
                 className="w-full p-4 text-lg border-3 border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-300 focus:border-blue-500"
               />
             </div>
@@ -300,13 +367,13 @@ const PreAssessmentForm: React.FC = () => {
         </div>
         
         <div className="grid gap-4 max-w-2xl mx-auto">
-          {readingLevels.map(level => (
+          {reading_levels.map(level => (
             <button
               key={level.value}
               type="button"
-              onClick={() => handleInputChange('readingLevel', level.value)}
+              onClick={() => handleInputChange('reading_level', level.value)}
               className={`p-6 text-left rounded-xl border-3 transition-all duration-200 hover:scale-102 ${
-                formData.readingLevel === level.value
+                formData.reading_level === level.value
                   ? 'border-blue-500 bg-blue-100 shadow-lg'
                   : 'border-gray-300 bg-white hover:border-blue-300 hover:bg-blue-50'
               }`}
@@ -315,26 +382,26 @@ const PreAssessmentForm: React.FC = () => {
                 <span className="text-3xl">{level.emoji}</span>
                 <div>
                   <div className={`text-lg font-semibold ${
-                    formData.readingLevel === level.value ? 'text-blue-800' : 'text-gray-800'
+                    formData.reading_level === level.value ? 'text-blue-800' : 'text-gray-800'
                   }`}>
                     {level.value}
                   </div>
                   <div className={`text-sm ${
-                    formData.readingLevel === level.value ? 'text-blue-600' : 'text-gray-600'
+                    formData.reading_level === level.value ? 'text-blue-600' : 'text-gray-600'
                   }`}>
                     {level.description}
                   </div>
                 </div>
-                {formData.readingLevel === level.value && (
+                {formData.reading_level === level.value && (
                   <Check className="h-6 w-6 text-blue-600 ml-auto" />
                 )}
               </div>
             </button>
           ))}
         </div>
-        {errors.readingLevel && (
+        {errors.reading_level && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg max-w-md mx-auto">
-            <p className="text-red-600 text-center font-medium">{errors.readingLevel as string}</p>
+            <p className="text-red-600 text-center font-medium">{errors.reading_level as string}</p>
           </div>
         )}
       </div>
@@ -352,18 +419,18 @@ const PreAssessmentForm: React.FC = () => {
       <div className="space-y-6 max-w-2xl mx-auto">
         {/* Reading Difficulty */}
         <div className={`p-6 rounded-xl border-3 cursor-pointer transition-all duration-200 ${
-          formData.hasReadingDifficulty 
+          formData.has_reading_difficulty 
             ? 'border-blue-500 bg-blue-100' 
             : 'border-gray-300 bg-white hover:border-blue-300 hover:bg-blue-50'
         }`}
-        onClick={() => handleInputChange('hasReadingDifficulty', !formData.hasReadingDifficulty)}>
+        onClick={() => handleInputChange('has_reading_difficulty', !formData.has_reading_difficulty)}>
           <div className="flex items-center gap-4">
             <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${
-              formData.hasReadingDifficulty 
+              formData.has_reading_difficulty 
                 ? 'border-blue-500 bg-blue-500' 
                 : 'border-gray-300'
             }`}>
-              {formData.hasReadingDifficulty && <Check className="h-4 w-4 text-white" />}
+              {formData.has_reading_difficulty && <Check className="h-4 w-4 text-white" />}
             </div>
             <div>
               <div className="text-lg font-semibold text-gray-800">
@@ -378,18 +445,18 @@ const PreAssessmentForm: React.FC = () => {
 
         {/* Needs Assistance */}
         <div className={`p-6 rounded-xl border-3 cursor-pointer transition-all duration-200 ${
-          formData.needsAssistance 
+          formData.needs_assistance 
             ? 'border-blue-500 bg-blue-100' 
             : 'border-gray-300 bg-white hover:border-blue-300 hover:bg-blue-50'
         }`}
-        onClick={() => handleInputChange('needsAssistance', !formData.needsAssistance)}>
+        onClick={() => handleInputChange('needs_assistance', !formData.needs_assistance)}>
           <div className="flex items-center gap-4">
             <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${
-              formData.needsAssistance 
+              formData.needs_assistance 
                 ? 'border-blue-500 bg-blue-500' 
                 : 'border-gray-300'
             }`}>
-              {formData.needsAssistance && <Check className="h-4 w-4 text-white" />}
+              {formData.needs_assistance && <Check className="h-4 w-4 text-white" />}
             </div>
             <div>
               <div className="text-lg font-semibold text-gray-800">
@@ -404,18 +471,18 @@ const PreAssessmentForm: React.FC = () => {
 
         {/* Previous Assessment */}
         <div className={`p-6 rounded-xl border-3 cursor-pointer transition-all duration-200 ${
-          formData.previousAssessment 
+          formData.previous_assessment 
             ? 'border-blue-500 bg-blue-100' 
             : 'border-gray-300 bg-white hover:border-blue-300 hover:bg-blue-50'
         }`}
-        onClick={() => handleInputChange('previousAssessment', !formData.previousAssessment)}>
+        onClick={() => handleInputChange('previous_assessment', !formData.previous_assessment)}>
           <div className="flex items-center gap-4">
             <div className={`w-6 h-6 rounded border-2 flex items-center justify-center ${
-              formData.previousAssessment 
+              formData.previous_assessment 
                 ? 'border-blue-500 bg-blue-500' 
                 : 'border-gray-300'
             }`}>
-              {formData.previousAssessment && <Check className="h-4 w-4 text-white" />}
+              {formData.previous_assessment && <Check className="h-4 w-4 text-white" />}
             </div>
             <div>
               <div className="text-lg font-semibold text-gray-800">
@@ -430,7 +497,7 @@ const PreAssessmentForm: React.FC = () => {
       </div>
 
       {/* Recommendation */}
-      {((formData.age > 0 || formData.birthdate) && formData.readingLevel) && (
+      {((formData.age > 0 || formData.birthdate) && formData.reading_level) && (
         <div className="mt-8 p-6 bg-green-50 border-l-4 border-green-500 rounded-r-xl max-w-2xl mx-auto">
           <div className="flex items-center gap-3 mb-2">
             <div className="text-2xl">💡</div>
@@ -454,9 +521,16 @@ const PreAssessmentForm: React.FC = () => {
         return null;
     }
   };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 py-8">
+      {loadingExisting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 flex items-center gap-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="text-lg font-medium text-gray-700">Loading your information...</span>
+          </div>
+        </div>
+      )}
       <div className="max-w-4xl mx-auto px-4">
         <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
           {/* Header */}
@@ -549,14 +623,25 @@ const PreAssessmentForm: React.FC = () => {
                 >
                   Continue
                   <ChevronRight className="h-5 w-5" />
-                </button>
-              ) : (
+                </button>              ) : (
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-lg font-semibold hover:from-green-700 hover:to-green-800 transform hover:scale-105 transition-all duration-200 shadow-lg"
+                  disabled={isLoading}
+                  className={`flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-xl text-lg font-semibold hover:from-green-700 hover:to-green-800 transform hover:scale-105 transition-all duration-200 shadow-lg ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  Start My Test
-                  <ChevronRight className="h-5 w-5" />
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      Start My Test
+                      <ChevronRight className="h-5 w-5" />
+                    </>
+                  )}
                 </button>
               )}
             </div>

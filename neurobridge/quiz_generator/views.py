@@ -254,9 +254,8 @@ def generate_quiz_view(request):
         }, status=status.HTTP_400_BAD_REQUEST)    # Extract validated data
     validated_data = serializer.validated_data
     assessment_type = validated_data.get('assessment_type', 'both')
-    
-    # Get customized difficulty distribution based on pre-assessment data
-    custom_distribution = serializer.get_customized_difficulty_distribution()
+      # Get customized difficulty distribution based on pre-assessment data
+    custom_distribution = serializer.get_customized_difficulty_distribution(user=request.user)
     num_easy = custom_distribution['easy']
     num_moderate = custom_distribution['moderate']
     num_hard = custom_distribution['hard']
@@ -271,13 +270,33 @@ def generate_quiz_view(request):
     
     # Check if visual assessment is recommended
     use_visual_assessment = serializer.should_use_visual_assessment()
-    
-    # Log pre-assessment customization for debugging
+      # Log pre-assessment customization for debugging
     print(f"Pre-assessment customization applied:")
-    print(f"  Age: {validated_data.get('age', 'Not provided')}")
-    print(f"  Reading level: {validated_data.get('reading_level', 'Not provided')}")
-    print(f"  Has reading difficulty: {validated_data.get('has_reading_difficulty', False)}")
-    print(f"  Needs assistance: {validated_data.get('needs_assistance', False)}")
+    
+    # Get actual data used for customization (from user profile if available)
+    profile_age = None
+    profile_reading_level = None
+    profile_has_reading_difficulty = False
+    profile_needs_assistance = False
+    profile_completed = False
+    
+    if request.user.user_type == 'student':
+        try:
+            profile = request.user.student_profile
+            if profile.pre_assessment_completed:
+                profile_age = profile.age
+                profile_reading_level = profile.reading_level
+                profile_has_reading_difficulty = profile.has_reading_difficulty
+                profile_needs_assistance = profile.needs_assistance
+                profile_completed = True
+        except Exception:
+            pass
+    
+    print(f"  Pre-assessment completed: {profile_completed}")
+    print(f"  Age: {profile_age or validated_data.get('age', 'Not provided')}")
+    print(f"  Reading level: {profile_reading_level or validated_data.get('reading_level', 'Not provided')}")
+    print(f"  Has reading difficulty: {profile_has_reading_difficulty if profile_completed else validated_data.get('has_reading_difficulty', False)}")
+    print(f"  Needs assistance: {profile_needs_assistance if profile_completed else validated_data.get('needs_assistance', False)}")
     print(f"  Customized distribution: Easy={num_easy}, Moderate={num_moderate}, Hard={num_hard}")
     print(f"  Visual assessment recommended: {use_visual_assessment}")
 
@@ -413,11 +432,27 @@ def generate_quiz_view(request):
             'details': str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-def _get_customization_reason(validated_data):
+def _get_customization_reason(validated_data, user=None):
     """Helper function to explain why difficulty was customized."""
-    age = validated_data.get('age', 10)
-    reading_level = validated_data.get('reading_level', '')
-    has_reading_difficulty = validated_data.get('has_reading_difficulty', False)
+    # Get data from user profile if available
+    age = 10
+    reading_level = ''
+    has_reading_difficulty = False
+    
+    if user and hasattr(user, 'student_profile'):
+        try:
+            profile = user.student_profile
+            if profile.pre_assessment_completed:
+                age = profile.age or 10
+                reading_level = profile.reading_level or ''
+                has_reading_difficulty = profile.has_reading_difficulty
+        except Exception:
+            pass
+    
+    # Fallback to request data if profile data not available
+    age = validated_data.get('age', age)
+    reading_level = validated_data.get('reading_level', reading_level)
+    has_reading_difficulty = validated_data.get('has_reading_difficulty', has_reading_difficulty)
     
     if age < 7 or reading_level in ['Cannot read yet', 'Beginning reader (simple words)']:
         return "Adjusted for young age or beginning reading level"

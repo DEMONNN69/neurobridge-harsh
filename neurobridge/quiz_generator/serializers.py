@@ -89,16 +89,34 @@ class QuizGenerationRequestSerializer(serializers.Serializer):
             )
         
         return data
-    
-    def get_customized_difficulty_distribution(self):
+    def get_customized_difficulty_distribution(self, user=None):
         """
-        Adjust difficulty distribution based on pre-assessment data.
+        Adjust difficulty distribution based on pre-assessment data from user's profile.
         Returns a dictionary with customized question counts.
         """
         data = self.validated_data
-        age = data.get('age', 10)
-        reading_level = data.get('reading_level', '')
-        has_reading_difficulty = data.get('has_reading_difficulty', False)
+        
+        # Get pre-assessment data from user's profile if available
+        age = 10
+        reading_level = ''
+        has_reading_difficulty = False
+        needs_assistance = False
+        
+        if user and hasattr(user, 'student_profile'):
+            try:
+                profile = user.student_profile
+                if profile.pre_assessment_completed:
+                    age = profile.age or 10
+                    reading_level = profile.reading_level or ''
+                    has_reading_difficulty = profile.has_reading_difficulty
+                    needs_assistance = profile.needs_assistance
+            except Exception:
+                pass  # Use default values if profile access fails
+        
+        # Fallback to request data if profile data not available
+        age = data.get('age', age)
+        reading_level = data.get('reading_level', reading_level)
+        has_reading_difficulty = data.get('has_reading_difficulty', has_reading_difficulty)
         assessment_type = data.get('assessment_type', 'both')
         
         # Base question counts
