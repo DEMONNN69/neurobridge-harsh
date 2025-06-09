@@ -48,8 +48,7 @@ INSTALLED_APPS = [
       # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
-    'corsheaders',
-      # Local apps
+    'corsheaders',    # Local apps
     'authentication',
     'profiles',
     'learning',
@@ -57,6 +56,7 @@ INSTALLED_APPS = [
     'chatbot',
     'accessibility',
     'quiz_generator',
+    'classroom',
 ]
 
 MIDDLEWARE = [

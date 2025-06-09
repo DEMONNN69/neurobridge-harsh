@@ -5,6 +5,7 @@ import StudentRouteGuard from '../components/Auth/StudentRouteGuard';
 import { BookOpen, Award, Clock, Calendar, AlertCircle, TrendingUp } from 'lucide-react';
 import Chatbot from '../components/Chatbot/Chatbot';
 import Scheduler from '../components/Scheduler/Scheduler';
+import StudentClassrooms from '../components/Classroom/StudentClassrooms';
 import { useAuth } from '../hooks/useAuth';
 import { 
   apiService,
@@ -575,11 +576,15 @@ const StudentDashboard: React.FC = () => {
               )}
             </div>
           </DashboardLayout>
-        } />
-
-        <Route path="/scheduler" element={
+        } />        <Route path="/scheduler" element={
           <DashboardLayout>
             <Scheduler userRole="student" />
+          </DashboardLayout>
+        } />
+
+        <Route path="/classrooms" element={
+          <DashboardLayout>
+            <StudentClassrooms />
           </DashboardLayout>
         } />
 

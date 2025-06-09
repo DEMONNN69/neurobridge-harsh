@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { X, Home, Calendar, MessageSquare, Users, BookOpen, BarChart } from 'lucide-react';
+import { X, Home, Calendar, MessageSquare, Users, BookOpen, BarChart, School } from 'lucide-react';
 import { UserRole } from '../../context/AuthContext';
 
 interface SidebarProps {
@@ -11,10 +11,10 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, userRole }) => {
   const location = useLocation();
-  
-  const navigation = {
+    const navigation = {
     teacher: [
       { name: 'Dashboard', href: '/teacher/dashboard', icon: Home },
+      { name: 'My Classrooms', href: '/teacher/classrooms', icon: School },
       { name: 'Students', href: '/teacher/students', icon: Users },
       { name: 'Syllabus', href: '/teacher/syllabus', icon: BookOpen },
       { name: 'Scheduler', href: '/teacher/scheduler', icon: Calendar },
@@ -23,6 +23,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, userRole }) => {
     ],
     student: [
       { name: 'Dashboard', href: '/student/dashboard', icon: Home },
+      { name: 'My Classrooms', href: '/student/classrooms', icon: School },
       { name: 'My Learning', href: '/student/learning', icon: BookOpen },
       { name: 'Scheduler', href: '/student/scheduler', icon: Calendar },
       { name: 'My Progress', href: '/student/progress', icon: BarChart },

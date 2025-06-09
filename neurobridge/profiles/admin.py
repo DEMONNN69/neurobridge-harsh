@@ -14,9 +14,13 @@ class StudentProfileAdmin(admin.ModelAdmin):
 
 @admin.register(TeacherProfile)
 class TeacherProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'employee_id', 'department', 'years_of_experience', 'hire_date')
+    list_display = ('user', 'employee_id', 'department', 'years_of_experience', 'hire_date', 'classroom_count')
     list_filter = ('department', 'years_of_experience')
     search_fields = ('user__username', 'employee_id')
+    
+    def classroom_count(self, obj):
+        return obj.classrooms.count()
+    classroom_count.short_description = 'Total Classrooms'
 
 @admin.register(Achievement)
 class AchievementAdmin(admin.ModelAdmin):

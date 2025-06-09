@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/chatbot/', include('chatbot.urls')),
     path('api/accessibility/', include('accessibility.urls')),
     path('api/quiz/', include('quiz_generator.urls')),
+    path('api/classroom/', include('classroom.urls')),
 ]
 
 # Serve media files during development

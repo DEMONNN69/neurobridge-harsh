@@ -497,6 +497,50 @@ export interface CombinedAssessmentSubmission {
   total_assessment_time: number;
 }
 
+// Classroom interfaces
+export interface Classroom {
+  id: number;
+  name: string;
+  description?: string;
+  join_code: string;
+  created_at: string;
+  updated_at: string;
+  teacher: number;
+  teacher_name?: string;
+  student_count?: number;
+}
+
+export interface ClassroomMembership {
+  id: number;
+  joined_at: string;
+  is_active: boolean;
+  classroom: number;
+  student: number;
+  classroom_name?: string;
+  student_name?: string;
+}
+
+export interface ClassroomStudent {
+  id: number;
+  student_id: string;
+  student_name: string;
+  email: string;
+  joined_at: string;
+  is_active: boolean;
+  assessment_score?: number;
+  dyslexia_type?: string;
+  autism_score?: number;
+}
+
+export interface CreateClassroomData {
+  name: string;
+  description?: string;
+}
+
+export interface JoinClassroomData {
+  join_code: string;
+}
+
 class ApiService {
   private getHeaders(includeAuth: boolean = false): HeadersInit {
     const headers: HeadersInit = {
@@ -1042,14 +1086,79 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(data),
     });
-  }
-  async getPreAssessmentData(): Promise<PreAssessmentResponse | null> {
+  }  async getPreAssessmentData(): Promise<PreAssessmentResponse | null> {
     try {
       return await this.authenticatedRequest('/profiles/pre-assessment/get/');
     } catch (error) {
       // Return null if no pre-assessment data found
       return null;
     }
+  }
+
+  // Classroom API methods
+  
+  // Teacher classroom methods
+  async getClassrooms(): Promise<Classroom[]> {
+    return this.authenticatedRequest('/classroom/teacher-classrooms/');
+  }
+
+  async createClassroom(data: CreateClassroomData): Promise<Classroom> {
+    return this.authenticatedRequest('/classroom/create/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateClassroom(classroomId: number, data: Partial<CreateClassroomData>): Promise<Classroom> {
+    return this.authenticatedRequest(`/classroom/${classroomId}/update/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteClassroom(classroomId: number): Promise<{ message: string }> {
+    return this.authenticatedRequest(`/classroom/${classroomId}/delete/`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getClassroomStudents(classroomId: number): Promise<ClassroomStudent[]> {
+    return this.authenticatedRequest(`/classroom/${classroomId}/students/`);
+  }
+
+  async removeStudentFromClassroom(classroomId: number, studentId: number): Promise<{ message: string }> {
+    return this.authenticatedRequest(`/classroom/${classroomId}/remove-student/${studentId}/`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Student classroom methods
+  async getStudentClassrooms(): Promise<ClassroomMembership[]> {
+    return this.authenticatedRequest('/classroom/student-classrooms/');
+  }
+
+  async joinClassroom(data: JoinClassroomData): Promise<{ 
+    message: string; 
+    classroom: Classroom; 
+    membership: ClassroomMembership; 
+  }> {
+    return this.authenticatedRequest('/classroom/join/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+  async leaveClassroom(classroomId: number): Promise<{ message: string }> {
+    return this.authenticatedRequest(`/classroom/${classroomId}/leave/`, {
+      method: 'POST',
+    });
+  }
+
+  async getClassroomDetails(classroomId: number): Promise<Classroom> {
+    return this.authenticatedRequest(`/classroom/${classroomId}/`);
+  }
+
+  async getClassroomMembers(classroomId: number): Promise<ClassroomStudent[]> {
+    return this.authenticatedRequest(`/classroom/${classroomId}/members/`);
   }
 }
 

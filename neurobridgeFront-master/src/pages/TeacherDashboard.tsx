@@ -5,6 +5,7 @@ import TeacherRouteGuard from '../components/Auth/TeacherRouteGuard';
 import { BookOpen, Users, BarChart, Calendar, AlertCircle, TrendingUp, Clock, Building } from 'lucide-react';
 import Chatbot from '../components/Chatbot/Chatbot';
 import Scheduler from '../components/Scheduler/Scheduler';
+import TeacherClassrooms from '../components/Classroom/TeacherClassrooms';
 import { useAuth } from '../hooks/useAuth';
 import { apiService, TeacherProfile } from '../services/api';
 
@@ -352,11 +353,15 @@ const TeacherDashboard: React.FC = () => {
               )}
             </div>
           </DashboardLayout>
-        } />
-
-        <Route path="/scheduler" element={
+        } />        <Route path="/scheduler" element={
           <DashboardLayout>
             <Scheduler userRole="teacher" />
+          </DashboardLayout>
+        } />
+
+        <Route path="/classrooms" element={
+          <DashboardLayout>
+            <TeacherClassrooms />
           </DashboardLayout>
         } />
 
