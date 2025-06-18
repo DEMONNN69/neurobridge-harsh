@@ -14,6 +14,7 @@ import {
   Progress, 
   Task
 } from '../services/api';
+import TheoryOfMindPage from './TheoryOfMindPage';
 
 interface DashboardStats {
   total_achievements: number;
@@ -591,6 +592,12 @@ const StudentDashboard: React.FC = () => {
         <Route path="/chatbot" element={
           <DashboardLayout>
             <Chatbot userRole="student" />
+          </DashboardLayout>
+        } />
+
+        <Route path="/theory-of-mind-assessment" element={
+          <DashboardLayout>
+            <TheoryOfMindPage />
           </DashboardLayout>
         } />
       </Routes>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { X, Home, Calendar, MessageSquare, Users, BookOpen, BarChart, School } from 'lucide-react';
+import { X, Home, Calendar, MessageSquare, Users, BookOpen, BarChart, School, Brain } from 'lucide-react';
 import { UserRole } from '../../context/AuthContext';
 
 interface SidebarProps {
@@ -20,11 +20,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen, userRole }) => {
       { name: 'Scheduler', href: '/teacher/scheduler', icon: Calendar },
       { name: 'Performance', href: '/teacher/performance', icon: BarChart },
       { name: 'Chatbot', href: '/teacher/chatbot', icon: MessageSquare },
-    ],
-    student: [
+    ],    student: [
       { name: 'Dashboard', href: '/student/dashboard', icon: Home },
       { name: 'My Classrooms', href: '/student/classrooms', icon: School },
       { name: 'My Learning', href: '/student/learning', icon: BookOpen },
+      { name: 'Theory of Mind', href: '/student/theory-of-mind-assessment', icon: Brain },
       { name: 'Scheduler', href: '/student/scheduler', icon: Calendar },
       { name: 'My Progress', href: '/student/progress', icon: BarChart },
       { name: 'Chatbot', href: '/student/chatbot', icon: MessageSquare },
