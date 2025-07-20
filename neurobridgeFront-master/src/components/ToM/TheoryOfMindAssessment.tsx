@@ -52,7 +52,7 @@ interface ToMResults {
 const SALLY_ANNE_SCENES: SceneConfig[] = [
   {
     id: 'introduction',
-    duration: 3000,
+    duration: 6000,
     autoAdvance: true,
     narration: "Meet Sally and Anne. They are playing together in their room.",
     audioDescription: "Two girls, Sally and Anne, are standing in a room with two boxes - one blue and one red.",    elements: {
@@ -62,55 +62,61 @@ const SALLY_ANNE_SCENES: SceneConfig[] = [
       blueBox: { x: 200, y: 380, visible: true },
       redBox: { x: 550, y: 380, visible: true }
     }
-  },  {
+  },
+  {
     id: 'sally-hides-ball',
-    duration: 5000,
+    duration: 7000,
     autoAdvance: true,
     narration: "Sally takes her red ball and puts it in the blue box.",
-    audioDescription: "Sally picks up the red ball and places it inside the blue box.",    elements: {
-      sally: { x: 150, y: 280, visible: true, animation: 'moveToBox' },
-      anne: { x: 500, y: 280, visible: true },
-      redBall: { x: 200, y: 380, visible: true, animation: 'moveToBluebox' },
-      blueBox: { x: 200, y: 380, visible: true },
-      redBox: { x: 550, y: 380, visible: true }
+    audioDescription: "Sally picks up the red ball and places it inside the blue box.",
+    elements: {
+      sally: { x: 150, y: 300, visible: true, animation: 'moveToBox' },
+      anne: { x: 450, y: 300, visible: true },
+      redBall: { x: 200, y: 350, visible: true, animation: 'moveToBluebox' },
+      blueBox: { x: 200, y: 350, visible: true },
+      redBox: { x: 500, y: 350, visible: true }
     }
   },
   {
     id: 'sally-leaves',
-    duration: 3000,
+    duration: 6000,
     autoAdvance: true,
     narration: "Sally leaves the room to go outside and play.",
-    audioDescription: "Sally walks away and exits the room, leaving Anne alone with the boxes.",    elements: {
-      sally: { x: -100, y: 280, visible: false, animation: 'exitLeft' },
-      anne: { x: 500, y: 280, visible: true },
-      redBall: { x: 200, y: 380, visible: false }, // ball is inside blue box
-      blueBox: { x: 200, y: 380, visible: true },
-      redBox: { x: 550, y: 380, visible: true }
+    audioDescription: "Sally walks away and exits the room, leaving Anne alone with the boxes.",
+    elements: {
+      sally: { x: -100, y: 300, visible: false, animation: 'exitLeft' },
+      anne: { x: 450, y: 300, visible: true },
+      redBall: { x: 200, y: 350, visible: false }, // ball is inside blue box
+      blueBox: { x: 200, y: 350, visible: true },
+      redBox: { x: 500, y: 350, visible: true }
     }
-  },  {
+  },
+  {
     id: 'anne-moves-ball',
-    duration: 5000,
+    duration: 8000,
     autoAdvance: true,
     narration: "While Sally is away, Anne moves the red ball from the blue box to the red box.",
-    audioDescription: "Anne opens the blue box, takes out the red ball, and puts it in the red box instead.",    elements: {
-      sally: { x: -100, y: 280, visible: false },
-      anne: { x: 375, y: 280, visible: true, animation: 'moveToBoxes' },
-      redBall: { x: 550, y: 380, visible: true, animation: 'moveToRedbox' },
-      blueBox: { x: 200, y: 380, visible: true },
-      redBox: { x: 550, y: 380, visible: true }
+    audioDescription: "Anne opens the blue box, takes out the red ball, and puts it in the red box instead.",
+    elements: {
+      sally: { x: -100, y: 300, visible: false },
+      anne: { x: 350, y: 300, visible: true, animation: 'moveToBoxes' },
+      redBall: { x: 500, y: 350, visible: true, animation: 'moveToRedbox' },
+      blueBox: { x: 200, y: 350, visible: true },
+      redBox: { x: 500, y: 350, visible: true }
     }
   },
   {
     id: 'sally-returns',
-    duration: 3000,
+    duration: 6000,
     autoAdvance: false,
     narration: "Sally comes back and wants to find her red ball.",
-    audioDescription: "Sally returns to the room and looks at both boxes - the blue box and the red box.",    elements: {
-      sally: { x: 150, y: 280, visible: true, animation: 'enterLeft' },
-      anne: { x: 500, y: 280, visible: true },
-      redBall: { x: 550, y: 380, visible: false }, // ball is inside red box
-      blueBox: { x: 200, y: 380, visible: true },
-      redBox: { x: 550, y: 380, visible: true }
+    audioDescription: "Sally returns to the room and looks at both boxes - the blue box and the red box.",
+    elements: {
+      sally: { x: 150, y: 300, visible: true, animation: 'enterLeft' },
+      anne: { x: 450, y: 300, visible: true },
+      redBall: { x: 500, y: 350, visible: false }, // ball is inside red box
+      blueBox: { x: 200, y: 350, visible: true },
+      redBox: { x: 500, y: 350, visible: true }
     }
   }
 ];
@@ -162,8 +168,8 @@ const TheoryOfMindAssessment: React.FC<ToMAssessmentProps> = ({
     window.speechSynthesis.cancel(); // Stop any ongoing speech
     const utterance = new SpeechSynthesisUtterance(text);
     
-    // Adjust speech rate based on pre-assessment data
-    utterance.rate = preAssessmentData?.has_reading_difficulty ? 0.7 : 0.8;
+    // Adjust speech rate based on pre-assessment data - slower for better comprehension
+    utterance.rate = preAssessmentData?.has_reading_difficulty ? 0.5 : 0.6;
     utterance.pitch = preAssessmentData?.age && preAssessmentData.age < 10 ? 1.2 : 1.1;
     utterance.voice = window.speechSynthesis.getVoices().find(voice => 
       voice.lang.startsWith('en') && voice.name.includes('Female')
@@ -192,23 +198,36 @@ const TheoryOfMindAssessment: React.FC<ToMAssessmentProps> = ({
     }
   }, [currentSceneIndex, audioEnabled, speak]);
 
-  // Auto-advance logic
+  // Auto-advance logic with speech completion consideration
   useEffect(() => {
     if (!isPlaying || showQuestion) return;
 
     const timer = setTimeout(() => {
       if (currentScene.autoAdvance) {
-        advanceScene();
+        // Add extra delay after speech to ensure completion and comprehension
+        if (isNarrating) {
+          // If still speaking, wait longer
+          setTimeout(advanceScene, 2000);
+        } else {
+          // Add a pause after speech completion for comprehension
+          setTimeout(advanceScene, 1500);
+        }
       }
     }, currentScene.duration);
 
     return () => clearTimeout(timer);
-  }, [currentSceneIndex, isPlaying, showQuestion, currentScene, advanceScene]);
+  }, [currentSceneIndex, isPlaying, showQuestion, currentScene, advanceScene, isNarrating]);
 
-  // Narration on scene change
+  // Narration on scene change with better timing control
   useEffect(() => {
     if (isPlaying && audioEnabled && currentScene) {
-      speak(currentScene.narration);
+      // Add a small delay before starting speech to ensure scene is rendered
+      setTimeout(() => {
+        speak(currentScene.narration, () => {
+          // Speech completed - add extra pause for comprehension
+          console.log('Speech completed for scene:', currentScene.id);
+        });
+      }, 500);
     }
   }, [currentSceneIndex, audioEnabled, isPlaying, currentScene, speak]);
 
@@ -262,7 +281,7 @@ const TheoryOfMindAssessment: React.FC<ToMAssessmentProps> = ({
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">      {/* Header */}
+    <div className="w-full max-w-4xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-lg shadow-lg">      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -307,7 +326,7 @@ const TheoryOfMindAssessment: React.FC<ToMAssessmentProps> = ({
           </button>
         </div>
       </div>      {/* Scene Container */}
-      <div className="relative w-full h-[600px] bg-gradient-to-b from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border-2 border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
+      <div className="relative w-full h-[500px] bg-gradient-to-b from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border-2 border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden">
         
         {/* Scene Elements */}
         {currentScene && (
