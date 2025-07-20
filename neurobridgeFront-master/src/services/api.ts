@@ -1,5 +1,18 @@
 // API service for communicating with Django backend
-const API_BASE_URL = 'http://localhost:8000/api';
+const getApiBaseUrl = (): string => {
+  // Check if we're in a Codespace
+  const hostname = window.location.hostname;
+  
+  if (hostname.includes('.app.github.dev')) {
+    // We're in Codespaces - use your specific Codespace URL
+    return 'https://miniature-eureka-x7pwjg4g46j2qxw-8000.app.github.dev/api';
+  }
+  
+  // Default to localhost for local development
+  return 'http://localhost:8000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface LoginResponse {
   access: string;

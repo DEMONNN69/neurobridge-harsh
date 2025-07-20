@@ -33,7 +33,7 @@ SECRET_KEY = 'django-insecure-(1%#i8sya7j62ujz5tb*a6@jm&39woqeh7goxo_0zyrizowcb2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0','lmlicenses.wip4.adobe.com']
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -144,17 +144,18 @@ SIMPLE_JWT = {
     'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
 }
 
-# CORS settings
+# CORS settings - Allow all origins for development
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = False
+
+# Backup specific origins (commented out while using CORS_ALLOW_ALL_ORIGINS)
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3000", 
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+"https://miniature-eureka-x7pwjg4g46j2qxw-5173.app.github.dev",
 ]
-
-CORS_ALLOW_CREDENTIALS = True
-
-CORS_ALLOW_ALL_ORIGINS = True  # Only for development
 
 CORS_ALLOW_HEADERS = [
     'accept',
@@ -177,6 +178,17 @@ CORS_ALLOW_METHODS = [
     'POST',
     'PUT',
 ]
+
+# CSRF settings for Codespaces
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://miniature-eureka-x7pwjg4g46j2qxw-5173.app.github.dev",
+]
+
+
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
