@@ -29,7 +29,7 @@ urlpatterns = [
     path('api/accessibility/', include('accessibility.urls')),
     path('api/quiz/', include('quiz_generator.urls')),
     path('api/classroom/', include('classroom.urls')),
-    path('api/dyslexia/', include('dyslexia_assessment.urls')),
+    path('api/dyslexia-assessment/', include('dyslexia_assessment.urls')),
 ]
 
 # Serve media files during development

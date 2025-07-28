@@ -573,6 +573,44 @@ const StudentDashboard: React.FC = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* Manual Assessment Section */}
+                  <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
+                    <div className="px-4 py-5 sm:px-6 border-b border-gray-200 dark:border-gray-700">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white flex items-center">
+                        <AlertCircle className="h-5 w-5 mr-2 text-blue-500" />
+                        Dyslexia Assessment
+                      </h3>
+                    </div>
+                    <div className="px-4 py-5 sm:p-6">
+                      <div className="text-center">
+                        <div className="mx-auto h-12 w-12 text-blue-400">
+                          <svg fill="none" stroke="currentColor" viewBox="0 0 48 48" className="h-12 w-12">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m6 0h6m-6 4v4m0 4v4" />
+                          </svg>
+                        </div>
+                        <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+                          Manual Assessment Available
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                          Take a comprehensive dyslexia assessment with age-appropriate questions
+                        </p>
+                        <div className="mt-6">
+                          <button
+                            type="button"
+                            onClick={() => window.location.href = '/student/manual-assessment'}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <AlertCircle className="mr-2 h-4 w-4" />
+                            Start Manual Assessment
+                          </button>
+                        </div>
+                        <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                          Questions will be selected based on your age and profile
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
             </div>

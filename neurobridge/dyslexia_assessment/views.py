@@ -1,9 +1,11 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Q
+import uuid
 from .models import (
     TaskCategory, AgeRange, DifficultyLevel, Question, 
     QuestionOption, AssessmentSession, StudentResponse, QuestionSet
@@ -197,3 +199,224 @@ class QuestionSetViewSet(viewsets.ReadOnlyModelViewSet):
         questions = question_set.get_questions_for_student(student_profile)
         serializer = QuestionForAssessmentSerializer(questions, many=True)
         return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def start_manual_assessment(request):
+    """Start a new manual assessment session for a student"""
+    try:
+        student_age = request.data.get('student_age')
+        if not student_age:
+            return Response(
+                {'error': 'student_age is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get age-appropriate questions
+        age_ranges = AgeRange.objects.filter(
+            min_age__lte=student_age, 
+            max_age__gte=student_age
+        )
+        
+        if not age_ranges.exists():
+            # Fallback to closest age range
+            age_ranges = AgeRange.objects.all()
+        
+        # Get questions from different categories and difficulty levels
+        questions = Question.objects.filter(
+            is_active=True,
+            is_published=True,
+            age_ranges__in=age_ranges
+        ).distinct().order_by('?')[:10]  # Random selection of 10 questions
+        
+        if not questions.exists():
+            return Response(
+                {'error': 'No questions available for this age group'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Create assessment session
+        session = AssessmentSession.objects.create(
+            student=request.user,
+            status='in_progress',
+            pre_assessment_data={'student_age': student_age}
+        )
+        
+        # Serialize questions for frontend
+        question_serializer = QuestionForAssessmentSerializer(questions, many=True)
+        
+        return Response({
+            'session_id': str(session.id),
+            'questions': question_serializer.data,
+            'student_age': student_age,
+            'total_questions': len(questions)
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_manual_assessment(request):
+    """Submit completed manual assessment"""
+    try:
+        session_id = request.data.get('session_id')
+        responses = request.data.get('responses', [])
+        total_time = request.data.get('total_time', 0)
+        completion_status = request.data.get('completion_status', 'completed')
+        
+        if not session_id:
+            return Response(
+                {'error': 'session_id is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get session
+        try:
+            session = AssessmentSession.objects.get(
+                id=session_id, 
+                student=request.user
+            )
+        except AssessmentSession.DoesNotExist:
+            return Response(
+                {'error': 'Session not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if session.status != 'in_progress':
+            return Response(
+                {'error': 'Session is already completed'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Process responses
+        total_score = 0
+        max_possible_score = 0
+        
+        for response_data in responses:
+            question_id = response_data.get('question_id')
+            response_payload = response_data.get('response_data')
+            response_time = response_data.get('response_time', 0)
+            start_time = response_data.get('start_time')
+            end_time = response_data.get('end_time')
+            
+            try:
+                question = Question.objects.get(id=question_id)
+                max_possible_score += question.points
+                
+                # Determine if response is correct based on question type
+                is_correct = False
+                selected_option = None
+                text_response = ''
+                
+                if question.question_type == 'multiple_choice':
+                    # response_payload should be option ID
+                    try:
+                        selected_option = QuestionOption.objects.get(
+                            id=response_payload, 
+                            question=question
+                        )
+                        is_correct = selected_option.is_correct
+                    except QuestionOption.DoesNotExist:
+                        pass
+                        
+                elif question.question_type == 'true_false':
+                    # response_payload should be boolean
+                    # Need to check against correct answer in question data
+                    correct_answer = question.additional_data.get('correct_answer', True)
+                    is_correct = response_payload == correct_answer
+                    
+                elif question.question_type == 'text_response':
+                    # Store text response for manual review
+                    text_response = str(response_payload)
+                    is_correct = False  # Requires manual review
+                    
+                elif question.question_type in ['sequencing', 'matching']:
+                    # Complex response types - store for manual review
+                    is_correct = False  # Requires manual review
+                    
+                elif question.question_type == 'audio_response':
+                    # Audio response - store for manual review
+                    is_correct = False  # Requires manual review
+                
+                if is_correct:
+                    total_score += question.points
+                
+                # Create student response
+                StudentResponse.objects.create(
+                    session=session,
+                    question=question,
+                    selected_option=selected_option,
+                    text_response=text_response,
+                    response_data=response_payload,
+                    time_taken_seconds=response_time,
+                    is_correct=is_correct,
+                    needs_review=question.question_type in ['text_response', 'sequencing', 'matching', 'audio_response']
+                )
+                
+            except Question.DoesNotExist:
+                continue
+        
+        # Update session
+        session.status = completion_status
+        session.completed_at = timezone.now()
+        session.total_time_seconds = total_time
+        session.total_score = total_score
+        session.max_possible_score = max_possible_score
+        session.accuracy_percentage = (total_score / max_possible_score * 100) if max_possible_score > 0 else 0
+        session.save()
+        
+        # Calculate risk indicators based on performance
+        session.calculate_results()
+        
+        return Response({
+            'session_id': str(session.id),
+            'total_score': total_score,
+            'max_possible_score': max_possible_score,
+            'accuracy_percentage': session.accuracy_percentage,
+            'total_time': total_time,
+            'completion_status': completion_status,
+            'risk_indicators': session.risk_indicators
+        })
+        
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_manual_assessment_results(request, session_id):
+    """Get results for a specific assessment session"""
+    try:
+        session = AssessmentSession.objects.get(
+            id=session_id, 
+            student=request.user
+        )
+        serializer = AssessmentSessionSerializer(session)
+        return Response(serializer.data)
+        
+    except AssessmentSession.DoesNotExist:
+        return Response(
+            {'error': 'Session not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_manual_assessment_history(request):
+    """Get assessment history for the current user"""
+    sessions = AssessmentSession.objects.filter(
+        student=request.user
+    ).order_by('-started_at')
+    
+    serializer = AssessmentSessionSerializer(sessions, many=True)
+    return Response(serializer.data)

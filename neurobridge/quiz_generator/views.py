@@ -705,3 +705,168 @@ def submit_combined_assessment_view(request):
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_combined_manual_autism_view(request):
+    """
+    Submit combined assessment where dyslexia was completed manually and autism via quiz generator.
+    
+    Expected request data:
+    {
+        "dyslexia_results": {...},  # Results from manual dyslexia assessment
+        "dyslexia_responses": [...],  # Individual responses from manual assessment
+        "autism_session_id": "uuid-string",
+        "autism_answers": [...],  # Autism quiz answers
+        "total_autism_time": 300,
+        "autism_question_timings": [...],
+        "pre_assessment_data": {...}
+    }
+    """
+    # Check if user is a student
+    if request.user.user_type != 'student':
+        return Response({
+            'error': 'Only students can submit assessments'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Validate required fields
+    dyslexia_results = request.data.get('dyslexia_results')
+    dyslexia_responses = request.data.get('dyslexia_responses')
+    autism_session_id = request.data.get('autism_session_id')
+    autism_answers = request.data.get('autism_answers', [])
+    total_autism_time = request.data.get('total_autism_time', 0)
+    pre_assessment_data = request.data.get('pre_assessment_data', {})
+    
+    if not all([dyslexia_results, dyslexia_responses, autism_session_id, autism_answers]):
+        return Response({
+            'error': 'All assessment data is required'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        # Process autism answers
+        autism_correct = 0
+        autism_total = len(autism_answers)
+        wrong_questions = []
+        
+        for answer in autism_answers:
+            question_id = answer.get('question_id')
+            user_answer = answer.get('selected_answer')
+            response_time = answer.get('response_time', 0)
+            
+            try:
+                question = AssessmentQuestion.objects.get(question_id=question_id)
+                
+                # Verify correctness on backend
+                is_correct = False
+                if user_answer in ['A', 'B', 'C', 'D']:
+                    option_index = ord(user_answer) - ord('A')
+                    if 0 <= option_index < len(question.options):
+                        selected_option_text = question.options[option_index]
+                        is_correct = selected_option_text == question.correct_answer
+                        if is_correct:
+                            autism_correct += 1
+                
+                # Track wrong questions
+                if not is_correct:
+                    wrong_questions.append({
+                        'question_id': str(question_id),
+                        'condition_type': 'autism',
+                        'difficulty': question.difficulty_level,
+                        'user_answer': user_answer,
+                        'correct_answer': question.correct_answer
+                    })
+                    
+            except AssessmentQuestion.DoesNotExist:
+                print(f"Autism question with ID {question_id} not found")
+                continue
+        
+        # Calculate scores
+        autism_score = (autism_correct / autism_total * 100) if autism_total > 0 else 0
+        
+        # Extract dyslexia score from manual assessment results
+        dyslexia_score = 0
+        dyslexia_total_questions = len(dyslexia_responses)
+        if dyslexia_results and 'accuracy_percentage' in dyslexia_results:
+            dyslexia_score = float(dyslexia_results['accuracy_percentage'])
+        
+        # Calculate overall scores
+        total_questions = dyslexia_total_questions + autism_total
+        overall_accuracy = (dyslexia_score * dyslexia_total_questions + autism_score * autism_total) / total_questions if total_questions > 0 else 0
+        
+        # Create combined assessment session
+        session = AssessmentSession.objects.create(
+            user=request.user,
+            assessment_type='both',
+            total_questions=total_questions,
+            correct_answers=int(dyslexia_score * dyslexia_total_questions / 100) + autism_correct,
+            accuracy_percentage=overall_accuracy,
+            dyslexia_score=dyslexia_score,
+            autism_score=autism_score,
+            total_assessment_time=dyslexia_results.get('total_time', 0) + total_autism_time,
+            # Pre-assessment data fields
+            student_age=pre_assessment_data.get('age'),
+            student_grade=pre_assessment_data.get('grade'),
+            reading_level=pre_assessment_data.get('reading_level'),
+            primary_language=pre_assessment_data.get('primary_language', 'English'),
+            has_reading_difficulty=pre_assessment_data.get('has_reading_difficulty', False),
+            needs_assistance=pre_assessment_data.get('needs_assistance', False),
+            previous_assessment=pre_assessment_data.get('previous_assessment', False),
+            difficulty_customized=pre_assessment_data.get('difficulty_customized', False),
+            customization_reason=pre_assessment_data.get('customization_reason'),
+            visual_assessment_recommended=pre_assessment_data.get('visual_assessment_recommended', False),
+            predicted_dyslexic_type=random.choice(['phonological', 'surface', 'mixed', 'rapid_naming', 'double_deficit']),
+            predicted_severity=random.choice(['mild', 'moderate', 'severe'])
+        )
+        
+        # Save autism responses (dyslexia responses are already saved in manual assessment)
+        for answer in autism_answers:
+            question_id = answer.get('question_id')
+            user_answer = answer.get('selected_answer')
+            response_time = answer.get('response_time', 0)
+            is_correct = answer.get('is_correct', False)
+            
+            try:
+                question = AssessmentQuestion.objects.get(question_id=question_id)
+                
+                AssessmentResponse.objects.create(
+                    session=session,
+                    question=question,
+                    user_answer=user_answer,
+                    is_correct=is_correct,
+                    response_time=response_time
+                )
+            except AssessmentQuestion.DoesNotExist:
+                continue
+        
+        # Update student profile
+        student_profile, created = StudentProfile.objects.get_or_create(
+            user=request.user,
+            defaults={'student_id': f'STU{request.user.id:06d}'}
+        )
+        student_profile.assessment_score = overall_accuracy
+        student_profile.assessment_type = 'both'
+        student_profile.dyslexia_score = dyslexia_score
+        student_profile.autism_score = autism_score
+        student_profile.save()
+        
+        # Trigger both predictions asynchronously
+        try:
+            from .dyslexia_predictor import run_both_predictions_async
+            run_both_predictions_async(session.id)
+        except Exception as e:
+            print(f"Combined predictions failed: {e}")
+        
+        return Response({
+            'session_id': str(session.session_id),
+            'assessment_type': 'both',
+            'accuracy': overall_accuracy,
+            'total_questions': total_questions,
+            'dyslexia_score': dyslexia_score,
+            'autism_score': autism_score,
+            'wrong_questions': wrong_questions,
+            'message': 'Combined manual dyslexia + autism assessment completed successfully.'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response({
+            'error': f'Failed to save combined manual-autism assessment results: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

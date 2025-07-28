@@ -13,6 +13,7 @@ import AssessmentRedirect from './components/Auth/AssessmentRedirect';
 import PreAssessmentForm from './pages/PreAssessmentForm';
 import AssessmentTypeSelection from './pages/AssessmentTypeSelection';
 import AssessmentPage from './pages/AssessmentPage';
+import ManualAssessmentPage from './pages/ManualAssessmentPage';
 import TeacherProfileSetup from './pages/TeacherProfileSetup';
 import NotFound from './pages/NotFound';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
@@ -68,6 +69,12 @@ function App() {
         <Route path="/student/assessment" element={
           <ProtectedRoute allowedRoles={['student']}>
             {() => <AssessmentPage />}
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/student/manual-assessment" element={
+          <ProtectedRoute allowedRoles={['student']}>
+            {() => <ManualAssessmentPage />}
           </ProtectedRoute>
         } />
         

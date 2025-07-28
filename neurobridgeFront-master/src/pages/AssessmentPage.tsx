@@ -210,8 +210,17 @@ const AssessmentPage: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      // Check if this is autism assessment after manual dyslexia
+      const isAutismAfterDyslexia = localStorage.getItem('autismAfterDyslexia') === 'true';
+      
       // Get assessment type from localStorage or default to 'both'
-      const assessmentType = localStorage.getItem('assessmentType') || 'both';
+      let assessmentType = localStorage.getItem('assessmentType') || 'both';
+      
+      // Override assessment type if coming from manual dyslexia
+      if (isAutismAfterDyslexia) {
+        assessmentType = 'autism';
+        localStorage.removeItem('autismAfterDyslexia'); // Clean up
+      }
       
       // Get pre-assessment data from user's profile
       let preAssessmentData = null;
@@ -489,9 +498,51 @@ const AssessmentPage: React.FC = () => {
       const correctCount = finalAnswers.filter(a => a.is_correct).length;
       
       // Get assessment type from localStorage
-      const assessmentType = localStorage.getItem('assessmentType') || 'both';
+      let assessmentType = localStorage.getItem('assessmentType') || 'both';
       
-      // Get pre-assessment data from user profile API with localStorage fallback
+      // Check if we need to combine with manual dyslexia results
+      const dyslexiaResultsStr = localStorage.getItem('dyslexiaAssessmentResult');
+      const dyslexiaResponsesStr = localStorage.getItem('dyslexiaAssessmentResponses');
+      
+      if (dyslexiaResultsStr && dyslexiaResponsesStr && assessmentType === 'autism') {
+        // This is autism assessment after manual dyslexia - combine results
+        console.log('Combining autism results with manual dyslexia assessment');
+        
+        try {
+          const dyslexiaResults = JSON.parse(dyslexiaResultsStr);
+          const dyslexiaResponses = JSON.parse(dyslexiaResponsesStr);
+          
+          // Get pre-assessment data
+          let preAssessmentData = await getPreAssessmentData();
+          
+          // Call the combined submission endpoint
+          const combinedSubmission = {
+            dyslexia_results: dyslexiaResults,
+            dyslexia_responses: dyslexiaResponses,
+            autism_session_id: sessionId,
+            autism_answers: finalAnswers,
+            total_autism_time: totalTime,
+            autism_question_timings: finalQuestionTimings,
+            pre_assessment_data: preAssessmentData
+          };
+          
+          const result = await apiService.submitCombinedManualAutismAssessment(combinedSubmission);
+          
+          // Clean up stored data
+          localStorage.removeItem('dyslexiaAssessmentResult');
+          localStorage.removeItem('dyslexiaAssessmentResponses');
+          
+          setAssessmentResult(result);
+          setAssessmentComplete(true);
+          return;
+          
+        } catch (parseError) {
+          console.error('Failed to parse stored dyslexia results:', parseError);
+          // Fall back to regular submission
+        }
+      }
+      
+      // Regular submission for single assessments
       let preAssessmentData = await getPreAssessmentData();
       
       const submission: AssessmentSubmission = {

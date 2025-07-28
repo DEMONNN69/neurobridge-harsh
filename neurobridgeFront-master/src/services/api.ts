@@ -1173,6 +1173,55 @@ class ApiService {
   async getClassroomMembers(classroomId: number): Promise<ClassroomStudent[]> {
     return this.authenticatedRequest(`/classroom/${classroomId}/members/`);
   }
+
+  // Manual Assessment Methods
+  async startManualAssessment(studentAge: number): Promise<{
+    session_id: string;
+    questions: any[];
+    student_age: number;
+    total_questions: number;
+  }> {
+    return this.authenticatedRequest('/dyslexia-assessment/start/', {
+      method: 'POST',
+      body: JSON.stringify({ student_age: studentAge }),
+    });
+  }
+
+  async submitManualAssessment(submission: {
+    session_id: string;
+    responses: any[];
+    total_time: number;
+    student_age: number;
+    completion_status: string;
+  }): Promise<any> {
+    return this.authenticatedRequest('/dyslexia-assessment/submit/', {
+      method: 'POST',
+      body: JSON.stringify(submission),
+    });
+  }
+
+  async getManualAssessmentResults(sessionId: string): Promise<any> {
+    return this.authenticatedRequest(`/dyslexia-assessment/results/${sessionId}/`);
+  }
+
+  async getManualAssessmentHistory(): Promise<any[]> {
+    return this.authenticatedRequest('/dyslexia-assessment/history/');
+  }
+
+  async submitCombinedManualAutismAssessment(submission: {
+    dyslexia_results: any;
+    dyslexia_responses: any;
+    autism_session_id: string;
+    autism_answers: any[];
+    total_autism_time: number;
+    autism_question_timings: any[];
+    pre_assessment_data?: any;
+  }): Promise<any> {
+    return this.authenticatedRequest('/quiz/submit-combined-manual-autism/', {
+      method: 'POST',
+      body: JSON.stringify(submission),
+    });
+  }
 }
 
 export const apiService = new ApiService();

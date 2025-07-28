@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Brain, Users, Zap, ArrowRight, CheckCircle, ArrowLeft } from 'lucide-react';
+import { Brain, Users, Zap, ArrowRight, CheckCircle } from 'lucide-react';
 
 type AssessmentType = 'dyslexia' | 'autism' | 'both';
 
@@ -22,16 +22,16 @@ const AssessmentTypeSelection: React.FC = () => {
     {
       type: 'dyslexia',
       title: 'Dyslexia Assessment',
-      description: 'Focus on reading, phonological awareness, and language processing',
+      description: 'Comprehensive manual assessment with clinically-designed questions',
       features: [
-        'Word recognition and decoding',
-        'Phonological awareness',
-        'Reading comprehension',
-        'Visual processing of text'
+        'Age-appropriate question selection',
+        'Multiple question types (MCQ, text, sequencing)',
+        'Clinical significance tracking',
+        'Real-time response monitoring'
       ],
       icon: Brain,
       color: 'blue',
-      duration: '~8 minutes'
+      duration: '~10 minutes'
     },
     {
       type: 'autism',
@@ -50,16 +50,16 @@ const AssessmentTypeSelection: React.FC = () => {
     {
       type: 'both',
       title: 'Comprehensive Assessment',
-      description: 'Complete evaluation covering both dyslexia and autism characteristics',
+      description: 'Complete evaluation: manual dyslexia assessment + AI-generated autism questions',
       features: [
-        'Full dyslexia evaluation',
-        'Complete autism assessment',
+        'Manual dyslexia evaluation',
+        'AI-generated autism assessment',
         'Separate scores for each area',
         'Comprehensive analysis'
       ],
       icon: Zap,
       color: 'purple',
-      duration: '~15 minutes'
+      duration: '~18 minutes'
     }
   ];
 
@@ -73,11 +73,28 @@ const AssessmentTypeSelection: React.FC = () => {
     // Store the selected assessment type in localStorage for the assessment page to use
     localStorage.setItem('assessmentType', selectedType);
     
-    // Navigate to the assessment page
-    navigate('/student/assessment', { 
-      state: { assessmentType: selectedType },
-      replace: true 
-    });
+    // Navigate based on assessment type
+    if (selectedType === 'dyslexia') {
+      // Use manual assessment for dyslexia only
+      navigate('/student/manual-assessment', { 
+        state: { assessmentType: selectedType },
+        replace: true 
+      });
+    } else if (selectedType === 'both') {
+      // For comprehensive assessment, start with manual dyslexia assessment
+      // The ManualAssessmentPage will handle transitioning to autism assessment
+      localStorage.setItem('comprehensiveAssessment', 'true');
+      navigate('/student/manual-assessment', { 
+        state: { assessmentType: 'dyslexia', isComprehensive: true },
+        replace: true 
+      });
+    } else {
+      // Use quiz generator for autism-only assessments
+      navigate('/student/assessment', { 
+        state: { assessmentType: selectedType },
+        replace: true 
+      });
+    }
   };
 
   const getColorClasses = (color: string, isSelected: boolean) => {

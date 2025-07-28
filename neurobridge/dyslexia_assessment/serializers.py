@@ -49,27 +49,44 @@ class QuestionSerializer(serializers.ModelSerializer):
 class QuestionForAssessmentSerializer(serializers.ModelSerializer):
     """Serializer for questions during assessment - hides correct answers"""
     options = serializers.SerializerMethodField()
-    category_name = serializers.CharField(source='category.name', read_only=True)
-    difficulty_name = serializers.CharField(source='difficulty_level.name', read_only=True)
+    category = serializers.SerializerMethodField()
+    difficulty_level = serializers.SerializerMethodField()
+    age_ranges = AgeRangeSerializer(many=True, read_only=True)
     
     class Meta:
         model = Question
         fields = [
-            'id', 'title', 'question_text', 'question_type', 'category_name',
-            'difficulty_name', 'image', 'audio_file', 'instructions', 
-            'audio_instructions', 'points', 'time_limit', 'options', 'additional_data'
+            'id', 'title', 'question_text', 'question_type', 'category',
+            'difficulty_level', 'age_ranges', 'image', 'audio_file', 
+            'instructions', 'audio_instructions', 'points', 'time_limit', 
+            'options', 'additional_data'
         ]
+    
+    def get_category(self, obj):
+        """Return category information"""
+        return {
+            'id': str(obj.category.id),
+            'name': obj.category.name,
+            'clinical_significance': obj.category.clinical_significance
+        }
+    
+    def get_difficulty_level(self, obj):
+        """Return difficulty level information"""
+        return {
+            'name': obj.difficulty_level.name,
+            'description': obj.difficulty_level.description
+        }
     
     def get_options(self, obj):
         """Return options without revealing correct answers"""
-        options = obj.options.all()
+        options = obj.options.all().order_by('order')
         return [
             {
-                'id': option.id,
+                'id': str(option.id),
                 'option_text': option.option_text,
                 'option_image': option.option_image.url if option.option_image else None,
                 'option_audio': option.option_audio.url if option.option_audio else None,
-                'order': option.order
+                'explanation': option.explanation if option.explanation else None
             }
             for option in options
         ]
