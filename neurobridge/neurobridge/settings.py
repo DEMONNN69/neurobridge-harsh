@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'accessibility',
     'quiz_generator',
     'classroom',
+    'dyslexia_assessment',
 ]
 
 MIDDLEWARE = [
