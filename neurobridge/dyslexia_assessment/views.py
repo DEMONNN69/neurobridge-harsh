@@ -374,6 +374,15 @@ def submit_manual_assessment(request):
         # Calculate risk indicators based on performance
         session.calculate_results()
         
+        # Update student profile with assessment completion
+        from profiles.models import StudentProfile
+        student_profile, created = StudentProfile.objects.get_or_create(
+            user=request.user,
+            defaults={'student_id': f'STU{request.user.id:06d}'}
+        )
+        student_profile.assessment_score = session.accuracy_percentage
+        student_profile.save()
+        
         return Response({
             'session_id': str(session.id),
             'total_score': total_score,
