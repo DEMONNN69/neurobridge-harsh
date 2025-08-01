@@ -43,7 +43,14 @@ const Register: React.FC = () => {
     
     try {
       await register(fullName, username, email, password, confirmPassword, role);
-      navigate('/student/assessment-type');
+      // After successful registration, redirect based on user role
+      if (role === 'student') {
+        // New students should start with pre-assessment
+        navigate('/student/pre-assessment');
+      } else {
+        // Teachers go to profile setup or dashboard
+        navigate('/teacher/dashboard');
+      }
     } catch (err) {
       // Error is handled in AuthContext
     }

@@ -23,7 +23,7 @@ import type {
 
 const ManualAssessmentPage: React.FC = () => {
   const navigate = useNavigate();
-  const { logout, updateAssessmentStatus } = useAuth();
+  const { logout, updateAssessmentStatus, refreshAssessmentStatus } = useAuth();
   
   // State management
   const [session, setSession] = useState<ManualAssessmentSession | null>(null);
@@ -294,7 +294,7 @@ const ManualAssessmentPage: React.FC = () => {
     navigate('/login', { replace: true });
   };
 
-  const handleCompleteAssessment = () => {
+  const handleCompleteAssessment = async () => {
     if (isComprehensive) {
       // Store dyslexia results for later combination
       localStorage.setItem('dyslexiaAssessmentResult', JSON.stringify(assessmentResult));
@@ -309,9 +309,18 @@ const ManualAssessmentPage: React.FC = () => {
         replace: true 
       });
     } else {
-      // Single dyslexia assessment - proceed to dashboard
-      updateAssessmentStatus(true);
-      navigate('/student/dashboard?manual_assessment_completed=true', { replace: true });
+      // Single dyslexia assessment - refresh backend status and proceed to dashboard
+      try {
+        // Refresh assessment status from backend to ensure sync
+        await refreshAssessmentStatus();
+        
+        navigate('/student/dashboard?manual_assessment_completed=true', { replace: true });
+      } catch (error) {
+        console.error('Failed to refresh assessment completion status:', error);
+        // Fallback to optimistic update if backend check fails
+        updateAssessmentStatus(true);
+        navigate('/student/dashboard?manual_assessment_completed=true', { replace: true });
+      }
     }
   };
 

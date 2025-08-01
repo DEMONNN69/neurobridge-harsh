@@ -23,6 +23,7 @@ interface AuthContextType {
   checkAssessmentStatus: () => Promise<boolean>; // Helper function to check assessment status
   updateAssessmentStatus: (completed: boolean) => void; // Function to update assessment status
   updatePreAssessmentStatus: (completed: boolean) => void; // Function to update pre-assessment status
+  refreshAssessmentStatus: () => Promise<void>; // Function to refresh assessment status from backend
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -36,6 +37,7 @@ export const AuthContext = createContext<AuthContextType>({
   checkAssessmentStatus: async () => false,
   updateAssessmentStatus: () => {},
   updatePreAssessmentStatus: () => {},
+  refreshAssessmentStatus: async () => {},
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -61,12 +63,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           };          // For students, check assessment completion status and pre-assessment status
           if (user.role === 'student') {
             try {
-              const assessmentStatus = await apiService.checkAssessmentCompletion();
+              const [assessmentStatus, preAssessmentStatus] = await Promise.all([
+                apiService.checkAssessmentCompletion(),
+                apiService.checkPreAssessmentCompletion()
+              ]);
               user.assessmentCompleted = assessmentStatus.completed;
-              console.log('Assessment status during auth check:', assessmentStatus.completed);
-                // Check pre-assessment completion status
-              const preAssessmentResponse = await apiService.getPreAssessmentData();
-              user.preAssessmentCompleted = preAssessmentResponse?.pre_assessment_completed || false;
+              user.preAssessmentCompleted = preAssessmentStatus.completed;
+              console.log('Assessment status during auth check:', user.assessmentCompleted);
               console.log('Pre-assessment status during auth check:', user.preAssessmentCompleted);
             } catch (error) {
               console.error('Failed to check assessment/pre-assessment status during auth check:', error);
@@ -119,6 +122,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshAssessmentStatus = async (): Promise<void> => {
+    if (!user || user.role !== 'student') {
+      return;
+    }
+    
+    try {
+      const response = await apiService.checkAssessmentCompletion();
+      const updatedUser = { ...user, assessmentCompleted: response.completed };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('Refreshed assessment status from backend:', response.completed);
+    } catch (error) {
+      console.error('Failed to refresh assessment status from backend:', error);
+    }
+  };
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
@@ -132,14 +151,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: response.user.user_type,
       };
       
-      // For students, check assessment completion status
+      // For students, check both assessment and pre-assessment completion status
       if (userData.role === 'student') {
         try {
-          const assessmentStatus = await apiService.checkAssessmentCompletion();
+          const [assessmentStatus, preAssessmentStatus] = await Promise.all([
+            apiService.checkAssessmentCompletion(),
+            apiService.checkPreAssessmentCompletion()
+          ]);
           userData.assessmentCompleted = assessmentStatus.completed;
+          userData.preAssessmentCompleted = preAssessmentStatus.completed;
+          console.log('Assessment status during login:', userData.assessmentCompleted);
+          console.log('Pre-assessment status during login:', userData.preAssessmentCompleted);
         } catch (error) {
           console.error('Failed to check assessment status:', error);
           userData.assessmentCompleted = false;
+          userData.preAssessmentCompleted = false;
         }
       }
       
@@ -175,6 +201,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: `${response.user.first_name} ${response.user.last_name}`,
         email: response.user.email,
         role: response.user.user_type,
+        // Set default values for new users
+        assessmentCompleted: false,
+        preAssessmentCompleted: false,
       };
       
       setUser(userData);
@@ -203,6 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         checkAssessmentStatus,
         updateAssessmentStatus,
         updatePreAssessmentStatus,
+        refreshAssessmentStatus,
       }}
     >
       {children}

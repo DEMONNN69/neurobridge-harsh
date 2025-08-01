@@ -24,16 +24,20 @@ const StudentRouteGuard: React.FC<StudentRouteGuardProps> = ({ children }) => {
   }
 
   // Use the assessment status from the auth context instead of making additional API calls
-  const isOnAssessmentPage = location.pathname === '/assessment';
+  const mainAssessmentRoutes = ['/assessment', '/student/assessment', '/student/manual-assessment'];
+  const preAssessmentRoutes = ['/student/pre-assessment', '/student/assessment-type-selection', '/student/assessment-type'];
+  
+  const isOnMainAssessmentPage = mainAssessmentRoutes.includes(location.pathname);
+  const isOnPreAssessmentPage = preAssessmentRoutes.includes(location.pathname);
   const needsAssessment = user?.assessmentCompleted === false;
 
-  // If student needs assessment and is not already on assessment page
-  if (needsAssessment && !isOnAssessmentPage) {
+  // If student needs assessment and is not on any assessment-related page, redirect to assessment
+  if (needsAssessment && !isOnMainAssessmentPage && !isOnPreAssessmentPage) {
     return <Navigate to="/assessment" replace />;
   }
 
-  // If student doesn't need assessment and is on assessment page, redirect to dashboard
-  if (!needsAssessment && isOnAssessmentPage) {
+  // If student doesn't need assessment and is on main assessment page, redirect to dashboard
+  if (!needsAssessment && isOnMainAssessmentPage) {
     return <Navigate to="/student/dashboard" replace />;
   }
 

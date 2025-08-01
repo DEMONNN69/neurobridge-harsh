@@ -1093,6 +1093,16 @@ class ApiService {
     return this.authenticatedRequest('/profiles/student/assessment-status/');
   }
 
+  // Check if student has completed pre-assessment
+  async checkPreAssessmentCompletion(): Promise<{ completed: boolean }> {
+    try {
+      const response = await this.getPreAssessmentData();
+      return { completed: response?.pre_assessment_completed || false };
+    } catch (error) {
+      return { completed: false };
+    }
+  }
+
   // Pre-assessment API methods
   async savePreAssessmentData(data: PreAssessmentData): Promise<{ message: string }> {
     return this.authenticatedRequest('/profiles/pre-assessment/save/', {

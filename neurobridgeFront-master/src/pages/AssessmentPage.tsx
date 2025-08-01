@@ -40,7 +40,7 @@ interface AssessmentPhase {
 
 const AssessmentPage: React.FC = () => {
   const navigate = useNavigate();
-  const { logout, updateAssessmentStatus } = useAuth();
+  const { logout, updateAssessmentStatus, refreshAssessmentStatus } = useAuth();
   
   // Helper function to get pre-assessment data from profile or fallback to localStorage
   const getPreAssessmentData = async () => {
@@ -568,13 +568,22 @@ const AssessmentPage: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to submit assessment');
       setSubmitting(false);
     }
-  };const handleCompleteAssessment = () => {
-    // Update the user's assessment completion status
-    updateAssessmentStatus(true);
-    
-    // Navigate immediately without clearing state to prevent regeneration
-    // The replace: true ensures user can't navigate back to assessment
-    navigate('/student/dashboard?assessment_completed=true', { replace: true });
+  };
+
+  const handleCompleteAssessment = async () => {
+    try {
+      // Refresh assessment status from backend to ensure sync
+      await refreshAssessmentStatus();
+      
+      // Navigate immediately without clearing state to prevent regeneration
+      // The replace: true ensures user can't navigate back to assessment
+      navigate('/student/dashboard?assessment_completed=true', { replace: true });
+    } catch (error) {
+      console.error('Failed to refresh assessment completion status:', error);
+      // Fallback to optimistic update if backend check fails
+      updateAssessmentStatus(true);
+      navigate('/student/dashboard?assessment_completed=true', { replace: true });
+    }
   };
 
   if (loading) {
