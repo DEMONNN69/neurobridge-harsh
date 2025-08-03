@@ -385,129 +385,156 @@ export interface ChatFeedback {
   user: number;
 }
 
-// Quiz Generator interfaces
-export interface QuizQuestion {
-  id: number;
-  question_id: string;  // UUID for tracking
-  question: string;
-  options: string[];
-  correct_answer: string;
-  difficulty: 'easy' | 'moderate' | 'hard';
-  condition: 'dyslexia' | 'autism';  // Track question type
-  explanation?: string;
+// New Assessment System Types - Import from assessment.ts
+export interface TaskCategory {
+  id: string;
+  name: string;
+  description: string;
+  clinical_significance: string;
+  weight: number;
+  is_active: boolean;
 }
 
-export interface QuizGenerationRequest {
-  condition?: 'dyslexia' | 'autism' | 'mixed';  // Made optional since backend determines this
-  num_easy?: number;  // Made optional - backend sets based on assessment_type
-  num_moderate?: number;  // Made optional - backend sets based on assessment_type
-  num_hard?: number;  // Made optional - backend sets based on assessment_type
-  assessment_type: string;  // Required - user's choice from frontend
-  
-  // Pre-assessment data fields for customization
-  age?: number;  // Student's age (3-100)
-  grade?: string;  // Student's grade level
-  reading_level?: string;  // Student's reading proficiency level
-  primary_language?: string;  // Student's primary language (default: 'English')
-  has_reading_difficulty?: boolean;  // Whether student has difficulty reading
-  needs_assistance?: boolean;  // Whether student may need assistance during assessment
-  previous_assessment?: boolean;  // Whether student has taken similar assessment before
-}
-
-export interface QuizGenerationResponse {
-  session_id: string;  // Added session tracking
-  questions: QuizQuestion[];
-  total_questions: number;
-  condition: string;
-  assessment_type: string;
-  dyslexia_questions?: number;  // Count of dyslexia questions
-  autism_questions?: number;    // Count of autism questions
-  difficulty_distribution: {
-    easy: number;
-    moderate: number;
-    hard: number;
-  };
-  pre_assessment_data?: {
-    age?: number;
-    grade?: string;
-    reading_level?: string;
-    primary_language?: string;
-    has_reading_difficulty?: boolean;
-    needs_assistance?: boolean;
-    previous_assessment?: boolean;
-  };
-  recommendations?: {
-    use_visual_assessment: boolean;
-    difficulty_customized: boolean;
-    customization_reason: string;
-  };
-  generated_at: string;
-  generated_by?: number;
-  message: string;
-}
-
-export interface QuizInfo {
-  available_conditions: string[];
-  difficulty_levels: string[];
-  max_questions_per_request: number;
-  min_questions_per_request: number;
-  supported_formats: string[];
-  api_version: string;
+export interface AgeRange {
+  id: string;
+  name: string;
+  min_age: number;
+  max_age: number;
   description: string;
 }
 
-export interface AssessmentAnswer {
-  question_id: string;  // Changed from question_index to question_id
-  selected_answer: string;
+export interface DifficultyLevel {
+  id: string;
+  name: 'beginner' | 'intermediate' | 'advanced';
+  description: string;
+  order: number;
+}
+
+export interface QuestionOption {
+  id: string;
+  option_text: string;
   is_correct: boolean;
-  response_time: number;  // Time taken for this specific question in seconds
+  order: number;
+  explanation?: string;
+  option_image?: string;
+  option_audio?: string;
 }
 
-export interface QuestionTiming {
-  question_id: string;
-  start_time: number;
-  end_time: number;
-  response_time: number;
+export interface Question {
+  id: string;
+  title: string;
+  question_text: string;
+  question_type: 'multiple_choice' | 'true_false' | 'text_response' | 'sequencing' | 'matching' | 'audio_response';
+  category: TaskCategory;
+  age_ranges: AgeRange[];
+  difficulty_level: DifficultyLevel;
+  grade_levels: string;
+  image?: string;
+  audio_file?: string;
+  instructions: string;
+  audio_instructions?: string;
+  points: number;
+  time_limit?: number;
+  is_active: boolean;
+  is_published: boolean;
+  additional_data: {
+    audio_prompt?: string;
+    expected_response?: string;
+    assessment_type?: string;
+    visual_stimulus?: string;
+    visual_stimulus_type?: string;
+    delay_duration?: number;
+    task_items?: string[];
+    processing_task?: string;
+    example_word?: string;
+    target_image?: string;
+    visual_type?: string;
+    show_instructions?: boolean;
+  };
+  options: QuestionOption[];
 }
 
-export interface AssessmentSubmission {
-  session_id?: string;  // Added session tracking
-  assessment_type?: string;  // Track user's assessment type choice
-  answers: AssessmentAnswer[];
-  total_questions: number;
-  correct_answers: number;
-  total_assessment_time: number;  // Total time for entire assessment in seconds
-  question_timings: QuestionTiming[];  // Detailed timing for each question
+export interface AssessmentSession {
+  id: string;
+  student: string;
+  status: 'in_progress' | 'completed' | 'abandoned';
+  started_at: string;
+  completed_at?: string;
+  total_time_seconds?: number;
+  total_score: number;
+  max_possible_score: number;
+  accuracy_percentage?: number;
+  risk_indicators: Record<string, 'high_risk' | 'moderate_risk' | 'low_risk'>;
+  pre_assessment_data: Record<string, any>;
 }
 
-export interface AssessmentResult {
+export interface StudentResponse {
+  id: string;
+  session: string;
+  question: string;
+  selected_option?: string;
+  text_response?: string;
+  response_data: Record<string, any>;
+  time_taken_seconds?: number;
+  is_correct: boolean;
+  score_earned: number;
+  auto_scored: boolean;
+  needs_review: boolean;
+  answered_at: string;
+}
+
+// API Request/Response Types
+export interface StartAssessmentRequest {
+  student_age: number;
+  pre_assessment_data?: Record<string, any>;
+}
+
+export interface StartAssessmentResponse {
   session_id: string;
-  assessment_type: string;
-  accuracy: number;
+  questions: Question[];
   total_questions: number;
-  correct_answers: number;
-  dyslexia_score?: number;  // Score for dyslexia questions only
-  autism_score?: number;    // Score for autism questions only
-  wrong_questions: Array<{
-    question_id: string;
-    condition_type: string;
-    difficulty: string;
-    user_answer: string;
-    correct_answer: string;
-  }>;
-  wrong_questions_count: number;
-  predicted_dyslexic_type: string;
-  predicted_severity: string;
+  student_age: number;
+}
+
+export interface SubmitResponseRequest {
+  session_id: string;
+  question_id: string;
+  selected_option_id?: string;
+  text_response?: string;
+  response_data?: Record<string, any>;
+  time_taken_seconds: number;
+}
+
+export interface SubmitResponseResponse {
+  response_id: string;
+  is_correct: boolean;
+  score_earned: number;
   message: string;
 }
 
-// Combined assessment interfaces
-export interface CombinedAssessmentSubmission {
-  dyslexia_session_id: string;
-  autism_session_id: string;
-  dyslexia_answers: AssessmentAnswer[];
-  autism_answers: AssessmentAnswer[];
-  total_assessment_time: number;
+export interface CompleteAssessmentRequest {
+  session_id: string;
+}
+
+export interface CompleteAssessmentResponse {
+  session: AssessmentSession;
+  responses: StudentResponse[];
+  risk_assessment: {
+    overall_risk: 'high_risk' | 'moderate_risk' | 'low_risk';
+    category_risks: Record<string, 'high_risk' | 'moderate_risk' | 'low_risk'>;
+    recommendations: string[];
+  };
+  summary: {
+    total_questions: number;
+    correct_answers: number;
+    accuracy_percentage: number;
+    total_time_seconds: number;
+    category_breakdown: Record<string, {
+      correct: number;
+      total: number;
+      accuracy: number;
+    }>;
+  };
 }
 
 // Classroom interfaces
@@ -1064,29 +1091,61 @@ class ApiService {
     });
   }
 
-  // Quiz Generator API methods
-  async generateQuiz(data: QuizGenerationRequest): Promise<QuizGenerationResponse> {
-    return this.authenticatedRequest('/quiz/generate/', {
+  // Dyslexia Assessment API methods
+  async startAssessment(data: StartAssessmentRequest): Promise<StartAssessmentResponse> {
+    return this.authenticatedRequest('/dyslexia-assessment/start/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async getQuizInfo(): Promise<QuizInfo> {
-    return this.authenticatedRequest('/quiz/info/');
-  }
-  async submitAssessment(data: AssessmentSubmission): Promise<AssessmentResult> {
-    return this.authenticatedRequest('/quiz/submit/', {
+  async submitResponse(data: SubmitResponseRequest): Promise<SubmitResponseResponse> {
+    return this.authenticatedRequest('/dyslexia-assessment/submit-response/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async submitCombinedAssessment(data: CombinedAssessmentSubmission): Promise<AssessmentResult> {
-    return this.authenticatedRequest('/quiz/submit-combined/', {
+  async submitAllResponses(data: {
+    session_id: string;
+    responses: Array<{
+      question_id: string;
+      category_name: string;
+      selected_option_id?: string;
+      text_response?: string;
+      response_data: Record<string, any>;
+      time_taken_seconds: number;
+      question_index: number;
+      category_index: number;
+      timestamp: number;
+    }>;
+    total_time_seconds: number;
+    completed_categories: string[];
+    student_age: number;
+  }): Promise<CompleteAssessmentResponse> {
+    return this.authenticatedRequest('/dyslexia-assessment/submit-all/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  async completeAssessment(data: CompleteAssessmentRequest): Promise<CompleteAssessmentResponse> {
+    return this.authenticatedRequest('/dyslexia-assessment/complete/', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getAssessmentSession(sessionId: string): Promise<AssessmentSession> {
+    return this.authenticatedRequest(`/dyslexia-assessment/session/${sessionId}/`);
+  }
+
+  async getAssessmentResults(sessionId: string): Promise<CompleteAssessmentResponse> {
+    return this.authenticatedRequest(`/dyslexia-assessment/results/${sessionId}/`);
+  }
+
+  async getStudentAssessmentHistory(): Promise<AssessmentSession[]> {
+    return this.authenticatedRequest('/dyslexia-assessment/history/');
   }
   // Check if student has completed assessment
   async checkAssessmentCompletion(): Promise<{ completed: boolean; assessment_score?: number }> {

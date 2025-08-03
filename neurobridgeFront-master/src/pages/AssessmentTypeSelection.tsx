@@ -75,16 +75,15 @@ const AssessmentTypeSelection: React.FC = () => {
     
     // Navigate based on assessment type
     if (selectedType === 'dyslexia') {
-      // Use manual assessment for dyslexia only
-      navigate('/student/manual-assessment', { 
+      // Use new assessment system for dyslexia only
+      navigate('/student/new-assessment', { 
         state: { assessmentType: selectedType },
         replace: true 
       });
     } else if (selectedType === 'both') {
-      // For comprehensive assessment, start with manual dyslexia assessment
-      // The ManualAssessmentPage will handle transitioning to autism assessment
+      // For comprehensive assessment, start with new dyslexia assessment
       localStorage.setItem('comprehensiveAssessment', 'true');
-      navigate('/student/manual-assessment', { 
+      navigate('/student/new-assessment', { 
         state: { assessmentType: 'dyslexia', isComprehensive: true },
         replace: true 
       });
