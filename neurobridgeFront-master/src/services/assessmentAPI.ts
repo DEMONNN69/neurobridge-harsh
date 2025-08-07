@@ -1,7 +1,5 @@
 import { apiService } from './api';
 import { 
-  StartAssessmentRequest, 
-  StartAssessmentResponse,
   SubmitResponseRequest,
   SubmitResponseResponse,
   CompleteAssessmentRequest,
@@ -16,41 +14,27 @@ import {
 class AssessmentAPI {
   // Create a new assessment session
   async createSession(userId: string): Promise<AssessmentSession> {
-    const requestData: StartAssessmentRequest = {
-      student_age: 12, // Default age, should be passed from user profile
-      pre_assessment_data: {}
-    };
+    // Create a mock session without making API calls to avoid unwanted backend requests
+    // Only make API calls when actually submitting the final assessment
+    const mockSessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const response: StartAssessmentResponse = await apiService.startAssessment(requestData);
-    
-    // Convert response to AssessmentSession format
-    return {
-      id: response.session_id,
+    return Promise.resolve({
+      id: mockSessionId,
       student: userId,
       status: 'in_progress',
       started_at: new Date().toISOString(),
       total_score: 0,
-      max_possible_score: response.questions.reduce((sum, q) => sum + q.points, 0),
+      max_possible_score: 100,
       risk_indicators: {},
-      pre_assessment_data: requestData.pre_assessment_data || {}
-    };
+      pre_assessment_data: {}
+    });
   }
 
   // Get questions for a specific category
   async getQuestionsByCategory(categoryName: string): Promise<Question[]> {
-    // For now, we'll start a session and filter questions by category
-    // In a real implementation, this would be a separate endpoint
-    const requestData: StartAssessmentRequest = {
-      student_age: 12,
-      pre_assessment_data: {}
-    };
-    
-    const response: StartAssessmentResponse = await apiService.startAssessment(requestData);
-    
-    // Filter questions by category name
-    return response.questions.filter(question => 
-      question.category.name.toLowerCase() === categoryName.toLowerCase()
-    );
+    // Return empty array to avoid any backend calls during assessment
+    // Questions will be handled by the category components themselves
+    return Promise.resolve([]);
   }
 
   // Submit a response to a question

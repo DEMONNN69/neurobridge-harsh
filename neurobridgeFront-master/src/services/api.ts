@@ -1123,9 +1123,18 @@ class ApiService {
     completed_categories: string[];
     student_age: number;
   }): Promise<CompleteAssessmentResponse> {
-    return this.authenticatedRequest('/dyslexia-assessment/submit-all/', {
+    // Map frontend data to backend expected format
+    const backendData = {
+      session_id: data.session_id,
+      responses: data.responses,
+      total_time: data.total_time_seconds,
+      student_age: data.student_age,
+      completion_status: 'completed'
+    };
+    
+    return this.authenticatedRequest('/dyslexia-assessment/submit/', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify(backendData),
     });
   }
 
